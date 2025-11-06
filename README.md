@@ -8,10 +8,21 @@ A simple self-contained Python application for Windows 11.
 - Menu bar with File > Exit option
 - Standalone executable that can be run by double-clicking
 
+## Quick Start for Windows 11
+
+**See `WINDOWS_INSTRUCTIONS.md` for detailed step-by-step instructions!**
+
+### Easiest Method:
+1. Double-click `build_exe.bat` to build the executable
+2. Go to the `dist` folder
+3. Double-click `Ebaylistingapp.exe` to run
+
 ## Building the Executable
 
-To create a standalone .exe file that doesn't require Python to be installed:
+### Windows (Easiest):
+Double-click `build_exe.bat`
 
+### Manual Method:
 1. Install PyInstaller (if not already installed):
    ```
    pip install -r requirements.txt
@@ -21,6 +32,7 @@ To create a standalone .exe file that doesn't require Python to be installed:
    ```
    python build_exe.py
    ```
+   Or: `python -m PyInstaller --onefile --windowed --name=Ebaylistingapp ebaylistingapp.py`
 
 3. The executable will be created in the `dist` folder as `Ebaylistingapp.exe`
 
