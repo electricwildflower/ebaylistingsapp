@@ -9,9 +9,15 @@ This creates a **completely standalone .exe file** that includes Python and all 
 - The .exe file is completely self-contained - no external files or dependencies required
 
 ### Step 1: Install Python (if not already installed)
+
+**See `INSTALL_PYTHON.md` for detailed installation instructions!**
+
+Quick steps:
 1. Download Python from https://www.python.org/downloads/
-2. During installation, **check the box "Add Python to PATH"** (important!)
+2. During installation, **CHECK THE BOX "Add Python to PATH"** (very important!)
 3. Complete the installation
+4. **Restart your computer** (important for PATH to take effect)
+5. Verify: Open Command Prompt and type `python --version` - you should see a version number
 
 ### Step 2: Build the Executable
 1. Open File Explorer and navigate to the `ebaylistingsapp` folder
