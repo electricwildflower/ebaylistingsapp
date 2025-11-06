@@ -17,8 +17,15 @@ python -m pip install --upgrade pyinstaller
 
 REM Build the executable
 echo.
-echo Building executable...
-python -m PyInstaller --onefile --windowed --name=Ebaylistingapp --clean ebaylistingapp.py
+echo Building standalone executable (this may take a few minutes)...
+python -m PyInstaller ^
+    --onefile ^
+    --windowed ^
+    --name=Ebaylistingapp ^
+    --clean ^
+    --noconfirm ^
+    --collect-all tkinter ^
+    ebaylistingapp.py
 
 if errorlevel 1 (
     echo.

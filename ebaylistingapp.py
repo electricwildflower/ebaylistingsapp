@@ -4,7 +4,6 @@ Ebaylistingapp - A simple self-contained application
 """
 
 import tkinter as tk
-from tkinter import messagebox
 
 
 class EbayListingApp:

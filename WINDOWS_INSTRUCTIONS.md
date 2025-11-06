@@ -1,8 +1,12 @@
 # How to Run on Windows 11
 
-## Option 1: Build and Run as Executable (Recommended - No Python needed after building)
+## Option 1: Build and Run as Executable (Recommended - Completely Self-Contained)
 
-This creates a standalone .exe file that you can double-click to run without needing Python installed.
+This creates a **completely standalone .exe file** that includes Python and all dependencies bundled inside. Once built, you can:
+- Double-click to run - **no Python installation needed**
+- Copy to any Windows 11 computer and run it
+- Share it with others - they don't need to install anything
+- The .exe file is completely self-contained - no external files or dependencies required
 
 ### Step 1: Install Python (if not already installed)
 1. Download Python from https://www.python.org/downloads/
@@ -20,7 +24,14 @@ This creates a standalone .exe file that you can double-click to run without nee
 2. Double-click `Ebaylistingapp.exe`
 3. The app will open!
 
-**Note:** After building, you can copy `Ebaylistingapp.exe` to any location and run it - it doesn't need Python or any other files.
+**Important:** The `Ebaylistingapp.exe` file is **completely self-contained**:
+- ✅ No Python installation needed to run it
+- ✅ No additional files or dependencies required
+- ✅ Can be copied to any Windows 11 computer and run immediately
+- ✅ Everything (Python runtime, tkinter, etc.) is bundled inside the .exe file
+- ✅ Just double-click and it runs - that's it!
+
+**Note:** You only need Python installed ONCE to build the executable. After that, the .exe file works independently on any Windows 11 computer without any installation.
 
 ---
 

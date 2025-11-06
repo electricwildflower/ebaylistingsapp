@@ -12,10 +12,16 @@ A simple self-contained Python application for Windows 11.
 
 **See `WINDOWS_INSTRUCTIONS.md` for detailed step-by-step instructions!**
 
-### Easiest Method:
-1. Double-click `build_exe.bat` to build the executable
+### Easiest Method (Creates Self-Contained Executable):
+1. Double-click `build_exe.bat` to build the executable (only needed once)
 2. Go to the `dist` folder
-3. Double-click `Ebaylistingapp.exe` to run
+3. Double-click `Ebaylistingapp.exe` to run - **no installation needed!**
+
+**The final .exe file is completely self-contained:**
+- ✅ Includes Python and all dependencies bundled inside
+- ✅ No installation required to run - just double-click
+- ✅ Can be copied to any Windows 11 computer and run immediately
+- ✅ No external files or dependencies needed
 
 ## Building the Executable
 
