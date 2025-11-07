@@ -1,0 +1,4 @@
+# Build-time dependencies
+pyinstaller>=6.10
+
+
