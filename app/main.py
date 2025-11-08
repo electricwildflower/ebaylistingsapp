@@ -1,30 +1,14 @@
-"""Minimal Tkinter GUI placeholder for ebaylistingapp."""
-
-from __future__ import annotations
-
 import tkinter as tk
 
 
 def main() -> None:
-    """Launch the placeholder GUI window."""
     root = tk.Tk()
-    root.title("ebaylistingapp")
-    root.configure(background="white")
-    root.geometry("480x320")
-
-    label = tk.Label(
-        root,
-        text="ebaylistingapp",
-        font=("Segoe UI", 24, "bold"),
-        background="white",
-        foreground="#333333",
-    )
-    label.pack(expand=True)
-
+    root.title("Ebay Listing App")
+    root.resizable(False, False)
+    label = tk.Label(root, text="ebaylistingapp", font=("Helvetica", 14))
+    label.pack(padx=20, pady=20)
     root.mainloop()
 
 
 if __name__ == "__main__":
     main()
-
-

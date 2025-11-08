@@ -1,3 +1,0 @@
-"""ebaylistingapp package initializer."""
-
-
