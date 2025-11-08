@@ -88,7 +88,7 @@ class EbayListingApp:
             "TopNav.TMenubutton",
             font=("Segoe UI Semibold", 11),
             padding=(12, 8),
-            background=self.card_bg,
+            background="#FFFFFF",
             foreground=self.text_color,
             borderwidth=0,
         )
@@ -96,29 +96,59 @@ class EbayListingApp:
             "TopNav.TMenubutton",
             background=[("active", "#E3F2FD"), ("pressed", "#D2E7FB")],
         )
+        style.configure(
+            "TopNavAccent.TButton",
+            font=("Segoe UI Semibold", 10),
+            padding=(12, 6),
+            background=self.accent_color,
+            foreground="#FFFFFF",
+            borderwidth=0,
+        )
+        style.map(
+            "TopNavAccent.TButton",
+            background=[("active", self.accent_hover)],
+        )
 
     def _create_top_bar(self) -> None:
-        self.top_bar = tk.Frame(self.root, bg=self.card_bg)
-        self.top_bar.pack(side="top", fill="x")
-        self.top_bar.configure(highlightbackground="#D7E3F7", highlightthickness=1)
+        self.top_bar = tk.Frame(self.root, bg="#FFFFFF")
+        self.top_bar_visible = False
 
-        brand = tk.Label(
-            self.top_bar,
-            text="Ebay Listing App",
-            font=("Segoe UI Semibold", 16),
-            bg=self.card_bg,
-            fg=self.text_color,
-        )
-        brand.pack(side="left", padx=(24, 20), pady=8)
+        row = tk.Frame(self.top_bar, bg="#FFFFFF")
+        row.pack(side="top", fill="x")
 
-        nav_container = tk.Frame(self.top_bar, bg=self.card_bg)
+        brand_frame = tk.Frame(row, bg="#FFFFFF")
+        brand_frame.pack(side="left", padx=(24, 18), pady=8)
+
+        brand_letters = [
+            ("e", "#E53238"),
+            ("b", "#0064D2"),
+            ("a", "#F5AF02"),
+            ("y", "#86B817"),
+        ]
+        for letter, color in brand_letters:
+            tk.Label(
+                brand_frame,
+                text=letter,
+                font=("Segoe UI Semibold", 22),
+                fg=color,
+                bg="#FFFFFF",
+            ).pack(side="left")
+        tk.Label(
+            brand_frame,
+            text=" listings",
+            font=("Segoe UI Semibold", 18),
+            fg="#0064D2",
+            bg="#FFFFFF",
+        ).pack(side="left", padx=(4, 0))
+
+        nav_container = tk.Frame(row, bg="#FFFFFF")
         nav_container.pack(side="left", padx=8, pady=4)
 
         file_button = ttk.Menubutton(nav_container, text="File", style="TopNav.TMenubutton")
         file_menu = tk.Menu(
             file_button,
             tearoff=0,
-            background=self.card_bg,
+            background="#FFFFFF",
             foreground=self.text_color,
             activebackground=self.accent_color,
             activeforeground="white",
@@ -131,7 +161,7 @@ class EbayListingApp:
         add_menu = tk.Menu(
             add_button,
             tearoff=0,
-            background=self.card_bg,
+            background="#FFFFFF",
             foreground=self.text_color,
             activebackground=self.accent_color,
             activeforeground="white",
@@ -145,7 +175,7 @@ class EbayListingApp:
         settings_menu = tk.Menu(
             settings_button,
             tearoff=0,
-            background=self.card_bg,
+            background="#FFFFFF",
             foreground=self.text_color,
             activebackground=self.accent_color,
             activeforeground="white",
@@ -155,16 +185,19 @@ class EbayListingApp:
         settings_button.configure(menu=settings_menu)
         settings_button.pack(side="left", padx=4)
 
-        spacer = tk.Frame(self.top_bar, bg=self.card_bg)
+        spacer = tk.Frame(row, bg="#FFFFFF")
         spacer.pack(side="left", expand=True, fill="x")
 
         exit_button = ttk.Button(
-            self.top_bar,
+            row,
             text="Exit",
-            style="Secondary.TButton",
+            style="TopNavAccent.TButton",
             command=self.root.quit,
         )
         exit_button.pack(side="right", padx=20, pady=8)
+
+        accent = tk.Frame(self.top_bar, bg="#0064D2", height=2)
+        accent.pack(side="top", fill="x")
 
     def _create_content_container(self) -> None:
         self.content_container = tk.Frame(self.root, bg=self.primary_bg)
@@ -316,21 +349,27 @@ class EbayListingApp:
         frame.pack(fill="both", expand=True)
 
     def show_main(self) -> None:
+        self._show_top_bar()
         self._show_frame(self.main_frame)
 
     def show_settings(self) -> None:
+        self._show_top_bar()
         self._show_frame(self.settings_view)
 
     def show_add_category(self) -> None:
+        self._show_top_bar()
         self._show_frame(self.add_category_frame)
 
     def show_add_item(self) -> None:
+        self._show_top_bar()
         self._show_frame(self.add_item_frame)
 
     def show_storage_config(self) -> None:
+        self._show_top_bar()
         self._show_frame(self.storage_config_frame)
 
     def show_first_run(self) -> None:
+        self._hide_top_bar()
         self._show_frame(self.first_run_frame)
 
     def _select_storage_path(self) -> None:
@@ -425,6 +464,18 @@ class EbayListingApp:
         if not self.storage_path:
             return
         self.show_main()
+
+    def _show_top_bar(self) -> None:
+        if not getattr(self, "top_bar_visible", False):
+            self.top_bar.pack(side="top", fill="x")
+            self.content_container.pack_forget()
+            self.content_container.pack(fill="both", expand=True)
+            self.top_bar_visible = True
+
+    def _hide_top_bar(self) -> None:
+        if getattr(self, "top_bar_visible", False):
+            self.top_bar.pack_forget()
+            self.top_bar_visible = False
 
 
 if __name__ == "__main__":
