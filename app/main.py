@@ -96,18 +96,7 @@ class EbayListingApp:
             "TopNav.TMenubutton",
             background=[("active", "#E3F2FD"), ("pressed", "#D2E7FB")],
         )
-        style.configure(
-            "TopNavAccent.TButton",
-            font=("Segoe UI Semibold", 10),
-            padding=(12, 6),
-            background=self.accent_color,
-            foreground="#FFFFFF",
-            borderwidth=0,
-        )
-        style.map(
-            "TopNavAccent.TButton",
-            background=[("active", self.accent_hover)],
-        )
+        # Placeholder style slot for future top bar buttons if needed.
 
     def _create_top_bar(self) -> None:
         self.top_bar = tk.Frame(self.root, bg="#FFFFFF")
@@ -116,33 +105,8 @@ class EbayListingApp:
         row = tk.Frame(self.top_bar, bg="#FFFFFF")
         row.pack(side="top", fill="x")
 
-        brand_frame = tk.Frame(row, bg="#FFFFFF")
-        brand_frame.pack(side="left", padx=(24, 18), pady=8)
-
-        brand_letters = [
-            ("e", "#E53238"),
-            ("b", "#0064D2"),
-            ("a", "#F5AF02"),
-            ("y", "#86B817"),
-        ]
-        for letter, color in brand_letters:
-            tk.Label(
-                brand_frame,
-                text=letter,
-                font=("Segoe UI Semibold", 22),
-                fg=color,
-                bg="#FFFFFF",
-            ).pack(side="left")
-        tk.Label(
-            brand_frame,
-            text=" listings",
-            font=("Segoe UI Semibold", 18),
-            fg="#0064D2",
-            bg="#FFFFFF",
-        ).pack(side="left", padx=(4, 0))
-
         nav_container = tk.Frame(row, bg="#FFFFFF")
-        nav_container.pack(side="left", padx=8, pady=4)
+        nav_container.pack(side="left", padx=(16, 8), pady=4)
 
         file_button = ttk.Menubutton(nav_container, text="File", style="TopNav.TMenubutton")
         file_menu = tk.Menu(
@@ -187,14 +151,6 @@ class EbayListingApp:
 
         spacer = tk.Frame(row, bg="#FFFFFF")
         spacer.pack(side="left", expand=True, fill="x")
-
-        exit_button = ttk.Button(
-            row,
-            text="Exit",
-            style="TopNavAccent.TButton",
-            command=self.root.quit,
-        )
-        exit_button.pack(side="right", padx=20, pady=8)
 
         accent = tk.Frame(self.top_bar, bg="#0064D2", height=2)
         accent.pack(side="top", fill="x")
