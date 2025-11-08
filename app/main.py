@@ -157,6 +157,14 @@ class EbayListingApp:
         file_button.configure(menu=file_menu)
         file_button.pack(side="left", padx=4)
 
+        home_button = ttk.Button(
+            nav_container,
+            text="Home",
+            style="TopNav.TMenubutton",
+            command=self.show_main,
+        )
+        home_button.pack(side="left", padx=4)
+
         add_button = ttk.Menubutton(nav_container, text="Add", style="TopNav.TMenubutton", direction="below")
         add_menu = tk.Menu(
             add_button,
