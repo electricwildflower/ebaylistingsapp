@@ -1,6 +1,8 @@
 import tkinter as tk
 from tkinter import ttk
 
+from .settings_view import SettingsView
+
 
 class EbayListingApp:
     def __init__(self) -> None:
@@ -84,6 +86,18 @@ class EbayListingApp:
         file_menu.add_command(label="Exit", command=self.root.quit)
         menu_bar.add_cascade(label="File", menu=file_menu)
 
+        add_menu = tk.Menu(
+            menu_bar,
+            tearoff=0,
+            background=self.card_bg,
+            foreground=self.text_color,
+            activebackground=self.accent_color,
+            activeforeground="white",
+        )
+        add_menu.add_command(label="Add a New Category", command=self.show_add_category)
+        add_menu.add_command(label="Add a New Item", command=self.show_add_item)
+        menu_bar.add_cascade(label="Add", menu=add_menu)
+
         settings_menu = tk.Menu(
             menu_bar,
             tearoff=0,
@@ -99,7 +113,16 @@ class EbayListingApp:
 
     def _create_frames(self) -> None:
         self.main_frame = tk.Frame(self.root, bg=self.primary_bg)
-        self.settings_frame = tk.Frame(self.root, bg=self.primary_bg)
+        self.settings_view = SettingsView(
+            self.root,
+            primary_bg=self.primary_bg,
+            card_bg=self.card_bg,
+            text_color=self.text_color,
+            show_main_callback=self.show_main,
+            toggle_fullscreen_callback=self.toggle_fullscreen_mode,
+        )
+        self.add_category_frame = tk.Frame(self.root, bg=self.primary_bg)
+        self.add_item_frame = tk.Frame(self.root, bg=self.primary_bg)
 
         hero_title = tk.Label(
             self.main_frame,
@@ -131,68 +154,54 @@ class EbayListingApp:
         )
         card_label.pack()
 
-        settings_header = tk.Label(
-            self.settings_frame,
-            text="App Settings",
-            font=("Segoe UI Semibold", 22),
+        category_label = tk.Label(
+            self.add_category_frame,
+            text="Add Category (placeholder)",
+            font=("Segoe UI Semibold", 18),
             bg=self.primary_bg,
             fg=self.text_color,
         )
-        settings_header.pack(pady=(40, 15))
+        category_label.pack(pady=40)
 
-        settings_subtitle = tk.Label(
-            self.settings_frame,
-            text="Customize how the app looks and feels to suit your workspace.",
-            font=("Segoe UI", 12),
+        item_label = tk.Label(
+            self.add_item_frame,
+            text="Add Item (placeholder)",
+            font=("Segoe UI Semibold", 18),
             bg=self.primary_bg,
-            fg="#305170",
-        )
-        settings_subtitle.pack(pady=(0, 30))
-
-        controls_container = tk.Frame(self.settings_frame, bg=self.card_bg, padx=30, pady=30)
-        controls_container.pack(pady=10)
-
-        toggle_label = tk.Label(
-            controls_container,
-            text="Display",
-            font=("Segoe UI Semibold", 13),
-            bg=self.card_bg,
             fg=self.text_color,
         )
-        toggle_label.pack(anchor="w")
+        item_label.pack(pady=40)
 
-        self.toggle_button = ttk.Button(
-            controls_container,
-            text="Switch to Fullscreen",
-            command=self.toggle_fullscreen_mode,
-            style="Primary.TButton",
-        )
-        self.toggle_button.pack(pady=(12, 0), fill="x")
-
-        back_button = ttk.Button(
-            self.settings_frame,
-            text="Back to Dashboard",
-            command=self.show_main,
-            style="Secondary.TButton",
-        )
-        back_button.pack(pady=(30, 10))
+    def _show_frame(self, frame: tk.Widget) -> None:
+        for widget in (
+            self.main_frame,
+            self.settings_view,
+            self.add_category_frame,
+            self.add_item_frame,
+        ):
+            widget.pack_forget()
+        frame.pack(fill="both", expand=True)
 
     def show_main(self) -> None:
-        self.settings_frame.pack_forget()
-        self.main_frame.pack(fill="both", expand=True)
+        self._show_frame(self.main_frame)
 
     def show_settings(self) -> None:
-        self.main_frame.pack_forget()
-        self.settings_frame.pack(fill="both", expand=True)
+        self._show_frame(self.settings_view)
+
+    def show_add_category(self) -> None:
+        self._show_frame(self.add_category_frame)
+
+    def show_add_item(self) -> None:
+        self._show_frame(self.add_item_frame)
 
     def toggle_fullscreen_mode(self) -> None:
         if not self.is_fullscreen:
             self.root.attributes("-fullscreen", True)
-            self.toggle_button.config(text="Switch to Windowed")
+            self.settings_view.update_toggle_label("Switch to Windowed")
         else:
             self.root.attributes("-fullscreen", False)
             self.root.geometry(self.default_geometry)
-            self.toggle_button.config(text="Switch to Fullscreen")
+            self.settings_view.update_toggle_label("Switch to Fullscreen")
         self.is_fullscreen = not self.is_fullscreen
 
     def run(self) -> None:
