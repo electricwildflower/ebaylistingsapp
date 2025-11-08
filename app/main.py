@@ -18,7 +18,7 @@ class EbayListingApp:
         self.text_color = "#0A2239"
 
         self.root.configure(bg=self.primary_bg)
-        self.root.option_add("*Font", "Segoe UI 11")
+        self.root.option_add("*Font", "{Segoe UI} 11")
 
         self._configure_styles()
         self._create_menu()
