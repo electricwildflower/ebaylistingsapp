@@ -31,6 +31,9 @@ class EbayListingApp:
 
         self.root.configure(bg=self.primary_bg)
         self.root.option_add("*Font", "{Segoe UI} 11")
+        self.root.option_add("*Menu.borderWidth", 0)
+        self.root.option_add("*Menu.relief", "flat")
+        self.root.option_add("*Menu.activeBorderWidth", 0)
 
         self.config_path = os.path.join(os.path.dirname(__file__), "app_config.json")
         self.config = self._load_config()
@@ -146,6 +149,9 @@ class EbayListingApp:
             foreground=self.text_color,
             activebackground=self.accent_color,
             activeforeground="white",
+            borderwidth=0,
+            relief="flat",
+            activeborderwidth=0,
         )
         file_menu.add_command(label="Exit", command=self.root.quit)
         file_button.configure(menu=file_menu)
@@ -159,6 +165,9 @@ class EbayListingApp:
             foreground=self.text_color,
             activebackground=self.accent_color,
             activeforeground="white",
+            borderwidth=0,
+            relief="flat",
+            activeborderwidth=0,
         )
         add_menu.add_command(label="Add a New Category", command=self.show_add_category)
         add_menu.add_command(label="Add a New Item", command=self.show_add_item)
@@ -173,6 +182,9 @@ class EbayListingApp:
             foreground=self.text_color,
             activebackground=self.accent_color,
             activeforeground="white",
+            borderwidth=0,
+            relief="flat",
+            activeborderwidth=0,
         )
         settings_menu.add_command(label="App Settings", command=self.show_settings)
         settings_menu.add_command(label="Storage Config", command=self.show_storage_config)
