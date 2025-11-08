@@ -1,5 +1,6 @@
+import os
 import tkinter as tk
-from tkinter import ttk, filedialog
+from tkinter import filedialog, messagebox, ttk
 
 try:
     from .settings_view import SettingsView
@@ -265,8 +266,24 @@ class EbayListingApp:
             mustexist=True,
         )
         if selected_dir:
-            self.storage_path = selected_dir
-            self.storage_value.set(f"Current storage folder:\n{selected_dir}")
+            selected_dir = os.path.abspath(selected_dir)
+            if os.path.basename(selected_dir.rstrip(os.sep)) == "ebaylistingsconfig":
+                config_dir = selected_dir
+            else:
+                config_dir = os.path.join(selected_dir, "ebaylistingsconfig")
+
+            try:
+                os.makedirs(config_dir, exist_ok=True)
+            except OSError as exc:
+                messagebox.showerror(
+                    "Storage Configuration",
+                    f"Unable to prepare the storage folder.\n\n{exc}",
+                    parent=self.root,
+                )
+                return
+
+            self.storage_path = config_dir
+            self.storage_value.set(f"Current storage folder:\n{config_dir}")
 
     def toggle_fullscreen_mode(self) -> None:
         if not self.is_fullscreen:
