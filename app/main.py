@@ -179,8 +179,26 @@ class EbayListingApp:
         )
         add_menu.add_command(label="Add a New Category", command=self.show_add_category)
         add_menu.add_command(label="Add a New Item", command=self.show_add_item)
+        add_menu.add_command(label="Re-add an Item", command=self.show_readd_item)
         add_button.configure(menu=add_menu)
         add_button.pack(side="left", padx=4)
+
+        remove_button = ttk.Menubutton(nav_container, text="Remove", style="TopNav.TMenubutton", direction="below")
+        remove_menu = tk.Menu(
+            remove_button,
+            tearoff=0,
+            background="#FFFFFF",
+            foreground=self.text_color,
+            activebackground=self.accent_color,
+            activeforeground="white",
+            borderwidth=0,
+            relief="flat",
+            activeborderwidth=0,
+        )
+        remove_menu.add_command(label="Remove an Item", command=self.show_remove_item)
+        remove_menu.add_command(label="End an Item", command=self.show_end_item)
+        remove_button.configure(menu=remove_menu)
+        remove_button.pack(side="left", padx=4)
 
         settings_button = ttk.Menubutton(nav_container, text="Settings", style="TopNav.TMenubutton", direction="below")
         settings_menu = tk.Menu(
@@ -222,6 +240,9 @@ class EbayListingApp:
         self.settings_view.update_toggle_label("Switch to Windowed" if self.is_fullscreen else "Switch to Fullscreen")
         self.add_category_frame = tk.Frame(self.content_container, bg=self.primary_bg)
         self.add_item_frame = tk.Frame(self.content_container, bg=self.primary_bg)
+        self.readd_item_frame = tk.Frame(self.content_container, bg=self.primary_bg)
+        self.remove_item_frame = tk.Frame(self.content_container, bg=self.primary_bg)
+        self.end_item_frame = tk.Frame(self.content_container, bg=self.primary_bg)
         self.storage_config_frame = tk.Frame(self.content_container, bg=self.primary_bg)
 
         hero_title = tk.Label(
@@ -271,6 +292,33 @@ class EbayListingApp:
             fg=self.text_color,
         )
         item_label.pack(pady=40)
+
+        readd_label = tk.Label(
+            self.readd_item_frame,
+            text="Re-add Item (placeholder)",
+            font=("Segoe UI Semibold", 18),
+            bg=self.primary_bg,
+            fg=self.text_color,
+        )
+        readd_label.pack(pady=40)
+
+        remove_label = tk.Label(
+            self.remove_item_frame,
+            text="Remove Item (placeholder)",
+            font=("Segoe UI Semibold", 18),
+            bg=self.primary_bg,
+            fg=self.text_color,
+        )
+        remove_label.pack(pady=40)
+
+        end_label = tk.Label(
+            self.end_item_frame,
+            text="End Item (placeholder)",
+            font=("Segoe UI Semibold", 18),
+            bg=self.primary_bg,
+            fg=self.text_color,
+        )
+        end_label.pack(pady=40)
 
         storage_header = tk.Label(
             self.storage_config_frame,
@@ -340,6 +388,9 @@ class EbayListingApp:
             self.settings_view,
             self.add_category_frame,
             self.add_item_frame,
+            self.readd_item_frame,
+            self.remove_item_frame,
+            self.end_item_frame,
             self.storage_config_frame,
             self.first_run_frame,
         ):
@@ -361,6 +412,18 @@ class EbayListingApp:
     def show_add_item(self) -> None:
         self._show_top_bar()
         self._show_frame(self.add_item_frame)
+
+    def show_readd_item(self) -> None:
+        self._show_top_bar()
+        self._show_frame(self.readd_item_frame)
+
+    def show_remove_item(self) -> None:
+        self._show_top_bar()
+        self._show_frame(self.remove_item_frame)
+
+    def show_end_item(self) -> None:
+        self._show_top_bar()
+        self._show_frame(self.end_item_frame)
 
     def show_storage_config(self) -> None:
         self._show_top_bar()
