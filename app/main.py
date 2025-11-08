@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, filedialog
 
 try:
     from .settings_view import SettingsView
@@ -110,6 +110,7 @@ class EbayListingApp:
             activeforeground="white",
         )
         settings_menu.add_command(label="App Settings", command=self.show_settings)
+        settings_menu.add_command(label="Storage Config", command=self.show_storage_config)
         menu_bar.add_cascade(label="Settings", menu=settings_menu)
 
         self.root.config(menu=menu_bar)
@@ -126,6 +127,8 @@ class EbayListingApp:
         )
         self.add_category_frame = tk.Frame(self.root, bg=self.primary_bg)
         self.add_item_frame = tk.Frame(self.root, bg=self.primary_bg)
+        self.storage_config_frame = tk.Frame(self.root, bg=self.primary_bg)
+        self.storage_path: str | None = None
 
         hero_title = tk.Label(
             self.main_frame,
@@ -175,12 +178,67 @@ class EbayListingApp:
         )
         item_label.pack(pady=40)
 
+        storage_header = tk.Label(
+            self.storage_config_frame,
+            text="Storage Configuration",
+            font=("Segoe UI Semibold", 22),
+            bg=self.primary_bg,
+            fg=self.text_color,
+        )
+        storage_header.pack(pady=(40, 12))
+
+        storage_description = tk.Label(
+            self.storage_config_frame,
+            text=(
+                "Choose the default folder where listings, categories, and shared data will be stored.\n"
+                "Pick a location that you and collaborators can both access."
+            ),
+            font=("Segoe UI", 12),
+            bg=self.primary_bg,
+            fg="#305170",
+            justify="center",
+        )
+        storage_description.pack(pady=(0, 24))
+
+        storage_card = tk.Frame(self.storage_config_frame, bg=self.card_bg, padx=30, pady=30)
+        storage_card.pack(pady=10)
+
+        self.storage_value = tk.StringVar(value="No folder selected yet.")
+
+        storage_value_label = tk.Label(
+            storage_card,
+            textvariable=self.storage_value,
+            font=("Segoe UI", 11),
+            bg=self.card_bg,
+            fg=self.text_color,
+            wraplength=420,
+            justify="left",
+        )
+        storage_value_label.pack(fill="x")
+
+        storage_button = ttk.Button(
+            storage_card,
+            text="Choose Storage Folder",
+            command=self._select_storage_path,
+            style="Primary.TButton",
+        )
+        storage_button.pack(pady=(18, 0), fill="x")
+
+        back_from_storage = ttk.Button(
+            self.storage_config_frame,
+            text="Back to Dashboard",
+            command=self.show_main,
+            style="Secondary.TButton",
+        )
+        back_from_storage.pack(pady=(30, 10))
+
     def _show_frame(self, frame: tk.Widget) -> None:
         for widget in (
             self.main_frame,
             self.settings_view,
             self.add_category_frame,
             self.add_item_frame,
+            self.storage_config_frame,
         ):
             widget.pack_forget()
         frame.pack(fill="both", expand=True)
@@ -196,6 +254,19 @@ class EbayListingApp:
 
     def show_add_item(self) -> None:
         self._show_frame(self.add_item_frame)
+
+    def show_storage_config(self) -> None:
+        self._show_frame(self.storage_config_frame)
+
+    def _select_storage_path(self) -> None:
+        selected_dir = filedialog.askdirectory(
+            parent=self.root,
+            title="Select Storage Folder",
+            mustexist=True,
+        )
+        if selected_dir:
+            self.storage_path = selected_dir
+            self.storage_value.set(f"Current storage folder:\n{selected_dir}")
 
     def toggle_fullscreen_mode(self) -> None:
         if not self.is_fullscreen:
