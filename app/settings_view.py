@@ -54,14 +54,6 @@ class SettingsView(tk.Frame):
         )
         self.toggle_button.pack(pady=(12, 0), fill="x")
 
-        back_button = ttk.Button(
-            self,
-            text="Back to Dashboard",
-            command=show_main_callback,
-            style="Secondary.TButton",
-        )
-        back_button.pack(pady=(30, 10))
-
     def update_toggle_label(self, text: str) -> None:
         self.toggle_button.config(text=text)
 

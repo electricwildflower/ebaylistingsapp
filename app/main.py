@@ -323,14 +323,6 @@ class EbayListingApp:
         )
         storage_button.pack(pady=(18, 0), fill="x")
 
-        back_from_storage = ttk.Button(
-            self.storage_config_frame,
-            text="Back to Dashboard",
-            command=self.show_main,
-            style="Secondary.TButton",
-        )
-        back_from_storage.pack(pady=(30, 10))
-
         default_base = self._default_storage_base_path()
         self.first_run_frame = FirstRunWizard(
             self.content_container,
