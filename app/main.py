@@ -8,6 +8,11 @@ try:
 except ImportError:
     from settings_view import SettingsView
 
+try:
+    from .firstrun import FirstRunWizard
+except ImportError:
+    from firstrun import FirstRunWizard
+
 
 class EbayListingApp:
     def __init__(self) -> None:
@@ -36,7 +41,10 @@ class EbayListingApp:
         self._create_menu()
         self._create_frames()
         self._apply_window_mode()
-        self.show_main()
+        if self.storage_path:
+            self.show_main()
+        else:
+            self.show_first_run()
 
     def _configure_styles(self) -> None:
         style = ttk.Style()
@@ -245,6 +253,17 @@ class EbayListingApp:
         )
         back_from_storage.pack(pady=(30, 10))
 
+        default_base = self._default_storage_base_path()
+        self.first_run_frame = FirstRunWizard(
+            self.root,
+            primary_bg=self.primary_bg,
+            card_bg=self.card_bg,
+            text_color=self.text_color,
+            default_base_path=default_base,
+            apply_path_callback=self._apply_storage_directory,
+            on_complete=self._on_first_run_complete,
+        )
+
     def _show_frame(self, frame: tk.Widget) -> None:
         for widget in (
             self.main_frame,
@@ -252,6 +271,7 @@ class EbayListingApp:
             self.add_category_frame,
             self.add_item_frame,
             self.storage_config_frame,
+            self.first_run_frame,
         ):
             widget.pack_forget()
         frame.pack(fill="both", expand=True)
@@ -271,6 +291,9 @@ class EbayListingApp:
     def show_storage_config(self) -> None:
         self._show_frame(self.storage_config_frame)
 
+    def show_first_run(self) -> None:
+        self._show_frame(self.first_run_frame)
+
     def _select_storage_path(self) -> None:
         selected_dir = filedialog.askdirectory(
             parent=self.root,
@@ -278,25 +301,7 @@ class EbayListingApp:
             mustexist=True,
         )
         if selected_dir:
-            selected_dir = os.path.abspath(selected_dir)
-            if os.path.basename(selected_dir.rstrip(os.sep)) == "ebaylistingsconfig":
-                config_dir = selected_dir
-            else:
-                config_dir = os.path.join(selected_dir, "ebaylistingsconfig")
-
-            try:
-                os.makedirs(config_dir, exist_ok=True)
-            except OSError as exc:
-                messagebox.showerror(
-                    "Storage Configuration",
-                    f"Unable to prepare the storage folder.\n\n{exc}",
-                    parent=self.root,
-                )
-                return
-
-            self.storage_path = config_dir
-            self.storage_value.set(f"Current storage folder:\n{config_dir}")
-            self._save_config()
+            self._apply_storage_directory(selected_dir)
 
     def toggle_fullscreen_mode(self) -> None:
         if not self.is_fullscreen:
@@ -317,6 +322,29 @@ class EbayListingApp:
             self.root.attributes("-fullscreen", False)
             self.root.geometry(self.default_geometry)
             self.settings_view.update_toggle_label("Switch to Fullscreen")
+
+    def _apply_storage_directory(self, base_path: str) -> bool:
+        normalized = os.path.abspath(base_path)
+        if os.path.basename(normalized.rstrip(os.sep)) == "ebaylistingsconfig":
+            config_dir = normalized
+        else:
+            config_dir = os.path.join(normalized, "ebaylistingsconfig")
+
+        try:
+            os.makedirs(config_dir, exist_ok=True)
+        except OSError as exc:
+            messagebox.showerror(
+                "Storage Configuration",
+                f"Unable to prepare the storage folder.\n\n{exc}",
+                parent=self.root,
+            )
+            return False
+
+        self.storage_path = config_dir
+        if hasattr(self, "storage_value"):
+            self.storage_value.set(f"Current storage folder:\n{config_dir}")
+        self._save_config()
+        return True
 
     def _load_config(self) -> dict[str, object]:
         if os.path.exists(self.config_path):
@@ -347,6 +375,17 @@ class EbayListingApp:
                 f"Unable to save settings.\n\n{exc}",
                 parent=self.root,
             )
+
+    def _default_storage_base_path(self) -> str:
+        documents = os.path.join(os.path.expanduser("~"), "Documents")
+        if os.path.isdir(documents):
+            return documents
+        return os.path.expanduser("~")
+
+    def _on_first_run_complete(self) -> None:
+        if not self.storage_path:
+            return
+        self.show_main()
 
 
 if __name__ == "__main__":
