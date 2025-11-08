@@ -1,3 +1,4 @@
+import json
 import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
@@ -26,9 +27,15 @@ class EbayListingApp:
         self.root.configure(bg=self.primary_bg)
         self.root.option_add("*Font", "{Segoe UI} 11")
 
+        self.config_path = os.path.join(os.path.dirname(__file__), "app_config.json")
+        self.config = self._load_config()
+        self.is_fullscreen = bool(self.config.get("fullscreen", False))
+        self.storage_path: str | None = self.config.get("storage_path")
+
         self._configure_styles()
         self._create_menu()
         self._create_frames()
+        self._apply_window_mode()
         self.show_main()
 
     def _configure_styles(self) -> None:
@@ -126,10 +133,10 @@ class EbayListingApp:
             show_main_callback=self.show_main,
             toggle_fullscreen_callback=self.toggle_fullscreen_mode,
         )
+        self.settings_view.update_toggle_label("Switch to Windowed" if self.is_fullscreen else "Switch to Fullscreen")
         self.add_category_frame = tk.Frame(self.root, bg=self.primary_bg)
         self.add_item_frame = tk.Frame(self.root, bg=self.primary_bg)
         self.storage_config_frame = tk.Frame(self.root, bg=self.primary_bg)
-        self.storage_path: str | None = None
 
         hero_title = tk.Label(
             self.main_frame,
@@ -204,7 +211,12 @@ class EbayListingApp:
         storage_card = tk.Frame(self.storage_config_frame, bg=self.card_bg, padx=30, pady=30)
         storage_card.pack(pady=10)
 
-        self.storage_value = tk.StringVar(value="No folder selected yet.")
+        initial_storage_value = (
+            f"Current storage folder:\n{self.storage_path}"
+            if self.storage_path
+            else "No folder selected yet."
+        )
+        self.storage_value = tk.StringVar(value=initial_storage_value)
 
         storage_value_label = tk.Label(
             storage_card,
@@ -284,19 +296,57 @@ class EbayListingApp:
 
             self.storage_path = config_dir
             self.storage_value.set(f"Current storage folder:\n{config_dir}")
+            self._save_config()
 
     def toggle_fullscreen_mode(self) -> None:
         if not self.is_fullscreen:
+            self.is_fullscreen = True
+        else:
+            self.is_fullscreen = False
+        self._apply_window_mode()
+        self._save_config()
+
+    def run(self) -> None:
+        self.root.mainloop()
+
+    def _apply_window_mode(self) -> None:
+        if self.is_fullscreen:
             self.root.attributes("-fullscreen", True)
             self.settings_view.update_toggle_label("Switch to Windowed")
         else:
             self.root.attributes("-fullscreen", False)
             self.root.geometry(self.default_geometry)
             self.settings_view.update_toggle_label("Switch to Fullscreen")
-        self.is_fullscreen = not self.is_fullscreen
 
-    def run(self) -> None:
-        self.root.mainloop()
+    def _load_config(self) -> dict[str, object]:
+        if os.path.exists(self.config_path):
+            try:
+                with open(self.config_path, "r", encoding="utf-8") as config_file:
+                    data = json.load(config_file)
+                    if isinstance(data, dict):
+                        return data
+            except (OSError, json.JSONDecodeError):
+                messagebox.showwarning(
+                    "Settings",
+                    "The settings file could not be read. Defaults will be used.",
+                    parent=self.root,
+                )
+        return {}
+
+    def _save_config(self) -> None:
+        data = {
+            "fullscreen": self.is_fullscreen,
+            "storage_path": self.storage_path,
+        }
+        try:
+            with open(self.config_path, "w", encoding="utf-8") as config_file:
+                json.dump(data, config_file, indent=2)
+        except OSError as exc:
+            messagebox.showwarning(
+                "Settings",
+                f"Unable to save settings.\n\n{exc}",
+                parent=self.root,
+            )
 
 
 if __name__ == "__main__":
