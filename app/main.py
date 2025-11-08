@@ -1,7 +1,10 @@
 import tkinter as tk
 from tkinter import ttk
 
-from .settings_view import SettingsView
+try:
+    from .settings_view import SettingsView
+except ImportError:
+    from settings_view import SettingsView
 
 
 class EbayListingApp:
