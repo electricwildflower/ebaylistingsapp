@@ -96,6 +96,36 @@ class EbayListingApp:
             "TopNav.TMenubutton",
             background=[("active", "#E3F2FD"), ("pressed", "#D2E7FB")],
         )
+        style.layout(
+            "TopNav.TMenubutton",
+            [
+                (
+                    "Menubutton.border",
+                    {
+                        "sticky": "nswe",
+                        "children": [
+                            (
+                                "Menubutton.focus",
+                                {
+                                    "sticky": "nswe",
+                                    "children": [
+                                        (
+                                            "Menubutton.padding",
+                                            {
+                                                "sticky": "nswe",
+                                                "children": [
+                                                    ("Menubutton.label", {"sticky": "nswe"})
+                                                ],
+                                            },
+                                        )
+                                    ],
+                                },
+                            )
+                        ],
+                    },
+                )
+            ],
+        )
         # Placeholder style slot for future top bar buttons if needed.
 
     def _create_top_bar(self) -> None:
@@ -108,7 +138,7 @@ class EbayListingApp:
         nav_container = tk.Frame(row, bg="#FFFFFF")
         nav_container.pack(side="left", padx=(16, 8), pady=4)
 
-        file_button = ttk.Menubutton(nav_container, text="File", style="TopNav.TMenubutton")
+        file_button = ttk.Menubutton(nav_container, text="File", style="TopNav.TMenubutton", direction="below")
         file_menu = tk.Menu(
             file_button,
             tearoff=0,
@@ -121,7 +151,7 @@ class EbayListingApp:
         file_button.configure(menu=file_menu)
         file_button.pack(side="left", padx=4)
 
-        add_button = ttk.Menubutton(nav_container, text="Add", style="TopNav.TMenubutton")
+        add_button = ttk.Menubutton(nav_container, text="Add", style="TopNav.TMenubutton", direction="below")
         add_menu = tk.Menu(
             add_button,
             tearoff=0,
@@ -135,7 +165,7 @@ class EbayListingApp:
         add_button.configure(menu=add_menu)
         add_button.pack(side="left", padx=4)
 
-        settings_button = ttk.Menubutton(nav_container, text="Settings", style="TopNav.TMenubutton")
+        settings_button = ttk.Menubutton(nav_container, text="Settings", style="TopNav.TMenubutton", direction="below")
         settings_menu = tk.Menu(
             settings_button,
             tearoff=0,
