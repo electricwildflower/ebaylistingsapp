@@ -38,7 +38,8 @@ class EbayListingApp:
         self.storage_path: str | None = self.config.get("storage_path")
 
         self._configure_styles()
-        self._create_menu()
+        self._create_top_bar()
+        self._create_content_container()
         self._create_frames()
         self._apply_window_mode()
         if self.storage_path:
@@ -83,19 +84,39 @@ class EbayListingApp:
             foreground=[("disabled", "#90A4AE")],
         )
 
-    def _create_menu(self) -> None:
-        menu_bar = tk.Menu(
-            self.root,
-            background=self.primary_bg,
+        style.configure(
+            "TopNav.TMenubutton",
+            font=("Segoe UI Semibold", 11),
+            padding=(12, 8),
+            background=self.card_bg,
             foreground=self.text_color,
-            activebackground=self.accent_color,
-            activeforeground="white",
             borderwidth=0,
-            tearoff=False,
+        )
+        style.map(
+            "TopNav.TMenubutton",
+            background=[("active", "#E3F2FD"), ("pressed", "#D2E7FB")],
         )
 
+    def _create_top_bar(self) -> None:
+        self.top_bar = tk.Frame(self.root, bg=self.card_bg)
+        self.top_bar.pack(side="top", fill="x")
+        self.top_bar.configure(highlightbackground="#D7E3F7", highlightthickness=1)
+
+        brand = tk.Label(
+            self.top_bar,
+            text="Ebay Listing App",
+            font=("Segoe UI Semibold", 16),
+            bg=self.card_bg,
+            fg=self.text_color,
+        )
+        brand.pack(side="left", padx=(24, 20), pady=8)
+
+        nav_container = tk.Frame(self.top_bar, bg=self.card_bg)
+        nav_container.pack(side="left", padx=8, pady=4)
+
+        file_button = ttk.Menubutton(nav_container, text="File", style="TopNav.TMenubutton")
         file_menu = tk.Menu(
-            menu_bar,
+            file_button,
             tearoff=0,
             background=self.card_bg,
             foreground=self.text_color,
@@ -103,10 +124,12 @@ class EbayListingApp:
             activeforeground="white",
         )
         file_menu.add_command(label="Exit", command=self.root.quit)
-        menu_bar.add_cascade(label="File", menu=file_menu)
+        file_button.configure(menu=file_menu)
+        file_button.pack(side="left", padx=4)
 
+        add_button = ttk.Menubutton(nav_container, text="Add", style="TopNav.TMenubutton")
         add_menu = tk.Menu(
-            menu_bar,
+            add_button,
             tearoff=0,
             background=self.card_bg,
             foreground=self.text_color,
@@ -115,10 +138,12 @@ class EbayListingApp:
         )
         add_menu.add_command(label="Add a New Category", command=self.show_add_category)
         add_menu.add_command(label="Add a New Item", command=self.show_add_item)
-        menu_bar.add_cascade(label="Add", menu=add_menu)
+        add_button.configure(menu=add_menu)
+        add_button.pack(side="left", padx=4)
 
+        settings_button = ttk.Menubutton(nav_container, text="Settings", style="TopNav.TMenubutton")
         settings_menu = tk.Menu(
-            menu_bar,
+            settings_button,
             tearoff=0,
             background=self.card_bg,
             foreground=self.text_color,
@@ -127,14 +152,28 @@ class EbayListingApp:
         )
         settings_menu.add_command(label="App Settings", command=self.show_settings)
         settings_menu.add_command(label="Storage Config", command=self.show_storage_config)
-        menu_bar.add_cascade(label="Settings", menu=settings_menu)
+        settings_button.configure(menu=settings_menu)
+        settings_button.pack(side="left", padx=4)
 
-        self.root.config(menu=menu_bar)
+        spacer = tk.Frame(self.top_bar, bg=self.card_bg)
+        spacer.pack(side="left", expand=True, fill="x")
+
+        exit_button = ttk.Button(
+            self.top_bar,
+            text="Exit",
+            style="Secondary.TButton",
+            command=self.root.quit,
+        )
+        exit_button.pack(side="right", padx=20, pady=8)
+
+    def _create_content_container(self) -> None:
+        self.content_container = tk.Frame(self.root, bg=self.primary_bg)
+        self.content_container.pack(fill="both", expand=True)
 
     def _create_frames(self) -> None:
-        self.main_frame = tk.Frame(self.root, bg=self.primary_bg)
+        self.main_frame = tk.Frame(self.content_container, bg=self.primary_bg)
         self.settings_view = SettingsView(
-            self.root,
+            self.content_container,
             primary_bg=self.primary_bg,
             card_bg=self.card_bg,
             text_color=self.text_color,
@@ -142,9 +181,9 @@ class EbayListingApp:
             toggle_fullscreen_callback=self.toggle_fullscreen_mode,
         )
         self.settings_view.update_toggle_label("Switch to Windowed" if self.is_fullscreen else "Switch to Fullscreen")
-        self.add_category_frame = tk.Frame(self.root, bg=self.primary_bg)
-        self.add_item_frame = tk.Frame(self.root, bg=self.primary_bg)
-        self.storage_config_frame = tk.Frame(self.root, bg=self.primary_bg)
+        self.add_category_frame = tk.Frame(self.content_container, bg=self.primary_bg)
+        self.add_item_frame = tk.Frame(self.content_container, bg=self.primary_bg)
+        self.storage_config_frame = tk.Frame(self.content_container, bg=self.primary_bg)
 
         hero_title = tk.Label(
             self.main_frame,
@@ -255,7 +294,7 @@ class EbayListingApp:
 
         default_base = self._default_storage_base_path()
         self.first_run_frame = FirstRunWizard(
-            self.root,
+            self.content_container,
             primary_bg=self.primary_bg,
             card_bg=self.card_bg,
             text_color=self.text_color,
