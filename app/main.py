@@ -1,6 +1,7 @@
 import json
 import os
 import tkinter as tk
+from typing import Any
 from tkinter import filedialog, messagebox, ttk
 
 try:
@@ -27,6 +28,7 @@ class EbayListingApp:
         self.root.geometry(self.default_geometry)
         self.root.resizable(False, False)
         self.is_fullscreen = False
+        self._main_mousewheel_bound = False
 
         self.primary_bg = "#F2F7FF"
         self.accent_color = "#1E88E5"
@@ -235,7 +237,24 @@ class EbayListingApp:
         self.content_container.pack(fill="both", expand=True)
 
     def _create_frames(self) -> None:
-        self.main_frame = tk.Frame(self.content_container, bg=self.primary_bg)
+        self.main_scroll_canvas = tk.Canvas(
+            self.content_container,
+            bg=self.primary_bg,
+            highlightthickness=0,
+            borderwidth=0,
+        )
+        self.main_scroll_canvas.pack(fill="both", expand=True)
+
+        self.main_frame = tk.Frame(self.main_scroll_canvas, bg=self.primary_bg)
+        self.main_scroll_window = self.main_scroll_canvas.create_window(
+            (0, 0), window=self.main_frame, anchor="nw"
+        )
+
+        self.main_frame.bind("<Configure>", self._sync_main_scroll_region)
+        self.main_scroll_canvas.bind("<Configure>", self._match_main_canvas_width)
+        self.main_scroll_canvas.bind("<Enter>", self._bind_main_mousewheel)
+        self.main_scroll_canvas.bind("<Leave>", self._unbind_main_mousewheel)
+
         self.settings_view = SettingsView(
             self.content_container,
             primary_bg=self.primary_bg,
@@ -385,7 +404,7 @@ class EbayListingApp:
 
     def _show_frame(self, frame: tk.Widget) -> None:
         for widget in (
-            self.main_frame,
+            self.main_scroll_canvas,
             self.settings_view,
             self.add_category_frame,
             self.add_item_frame,
@@ -398,9 +417,14 @@ class EbayListingApp:
             widget.pack_forget()
         frame.pack(fill="both", expand=True)
 
+        if frame is self.main_scroll_canvas:
+            self._sync_main_scroll_region(None)
+        else:
+            self._unbind_main_mousewheel(None)
+
     def show_main(self) -> None:
         self._show_top_bar()
-        self._show_frame(self.main_frame)
+        self._show_frame(self.main_scroll_canvas)
 
     def show_settings(self) -> None:
         self._show_top_bar()
@@ -648,9 +672,41 @@ class EbayListingApp:
                 )
                 meta_label.pack(anchor="w")
 
+        self._sync_main_scroll_region(None)
+
     def _update_categories_display(self, categories: list[dict[str, str]]) -> None:
         if hasattr(self, "main_categories_container"):
             self._render_main_categories(categories)
+
+    def _sync_main_scroll_region(self, _: Any) -> None:
+        if hasattr(self, "main_scroll_canvas"):
+            self.main_scroll_canvas.configure(scrollregion=self.main_scroll_canvas.bbox("all"))
+
+    def _match_main_canvas_width(self, event: Any) -> None:
+        if hasattr(self, "main_scroll_canvas"):
+            self.main_scroll_canvas.itemconfigure(self.main_scroll_window, width=event.width)
+
+    def _bind_main_mousewheel(self, _: Any) -> None:
+        if self._main_mousewheel_bound:
+            return
+        self.main_scroll_canvas.bind_all("<MouseWheel>", self._on_main_mousewheel)
+        self.main_scroll_canvas.bind_all("<Button-4>", self._on_main_mousewheel)
+        self.main_scroll_canvas.bind_all("<Button-5>", self._on_main_mousewheel)
+        self._main_mousewheel_bound = True
+
+    def _unbind_main_mousewheel(self, _: Any) -> None:
+        if not self._main_mousewheel_bound:
+            return
+        self.main_scroll_canvas.unbind_all("<MouseWheel>")
+        self.main_scroll_canvas.unbind_all("<Button-4>")
+        self.main_scroll_canvas.unbind_all("<Button-5>")
+        self._main_mousewheel_bound = False
+
+    def _on_main_mousewheel(self, event: Any) -> None:
+        if event.num == 4 or (hasattr(event, "delta") and event.delta > 0):
+            self.main_scroll_canvas.yview_scroll(-1, "units")
+        elif event.num == 5 or (hasattr(event, "delta") and event.delta < 0):
+            self.main_scroll_canvas.yview_scroll(1, "units")
 
     def _show_top_bar(self) -> None:
         if not getattr(self, "top_bar_visible", False):
