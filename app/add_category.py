@@ -29,6 +29,8 @@ class AddCategoryView(tk.Frame):
         self.storage_path = storage_path
         self.categories: list[dict[str, str]] = []
         self._dialog: tk.Toplevel | None = None
+        self._dialog_mode: str | None = None
+        self._editing_index: int | None = None
         self._dialog_name_var: tk.StringVar | None = None
         self._dialog_days_var: tk.StringVar | None = None
         self._dialog_description: tk.Text | None = None
@@ -98,13 +100,53 @@ class AddCategoryView(tk.Frame):
             )
             return
 
-        if self._dialog and self._dialog.winfo_exists():
-            self._dialog.lift()
-            self._dialog.focus_force()
+        self._open_category_dialog(mode="add")
+
+    def _handle_edit_category(self, index: int) -> None:
+        if not self.storage_path:
+            messagebox.showerror(
+                "Edit Category",
+                "Please configure a storage location before editing categories.",
+                parent=self.winfo_toplevel(),
+            )
             return
 
+        if index < 0 or index >= len(self.categories):
+            return
+
+        self._open_category_dialog(mode="edit", index=index)
+
+    def _delete_category(self, index: int) -> None:
+        if index < 0 or index >= len(self.categories):
+            return
+
+        category = self.categories[index]
+        confirmed = messagebox.askyesno(
+            "Delete Category",
+            f"Are you sure you want to delete \"{category['name']}\"?",
+            parent=self.winfo_toplevel(),
+            icon="warning",
+        )
+        if not confirmed:
+            return
+
+        del self.categories[index]
+        self._persist_categories()
+        self._render_category_cards()
+
+    def _open_category_dialog(self, mode: str, index: int | None = None) -> None:
+        if self._dialog and self._dialog.winfo_exists():
+            self._close_dialog()
+
+        category: dict[str, str] | None = None
+        if mode == "edit" and index is not None and 0 <= index < len(self.categories):
+            category = self.categories[index]
+
+        self._dialog_mode = mode
+        self._editing_index = index
         self._dialog = tk.Toplevel(self)
-        self._dialog.title("Add Category")
+        title = "Edit Category" if mode == "edit" else "Add Category"
+        self._dialog.title(title)
         self._dialog.configure(bg=self.primary_bg)
         self._dialog.transient(self.winfo_toplevel())
         self._dialog.grab_set()
@@ -114,17 +156,24 @@ class AddCategoryView(tk.Frame):
         dialog_frame = tk.Frame(self._dialog, bg=self.primary_bg, padx=24, pady=24)
         dialog_frame.pack(fill="both", expand=True)
 
-        self._dialog_name_var = tk.StringVar()
-        self._dialog_days_var = tk.StringVar(value="30")
+        default_name = category["name"] if category else ""
+        default_days = category["days"] if category else "30"
+        default_description = category["description"] if category else ""
+
+        self._dialog_name_var = tk.StringVar(value=default_name)
+        self._dialog_days_var = tk.StringVar(value=default_days or "30")
 
         ttk.Label(dialog_frame, text="Category Name", style="TLabel").grid(row=0, column=0, sticky="w")
         name_entry = ttk.Entry(dialog_frame, width=40, textvariable=self._dialog_name_var)
         name_entry.grid(row=1, column=0, sticky="we", pady=(4, 16))
         name_entry.focus_set()
+        name_entry.icursor("end")
 
         ttk.Label(dialog_frame, text="Description", style="TLabel").grid(row=2, column=0, sticky="w")
         self._dialog_description = tk.Text(dialog_frame, width=40, height=5, font=("Segoe UI", 11))
         self._dialog_description.grid(row=3, column=0, sticky="we", pady=(4, 16))
+        if default_description:
+            self._dialog_description.insert("1.0", default_description)
 
         tk.Label(
             dialog_frame,
@@ -146,7 +195,10 @@ class AddCategoryView(tk.Frame):
         button_row = tk.Frame(dialog_frame, bg=self.primary_bg)
         button_row.grid(row=6, column=0, sticky="e")
 
-        ttk.Button(button_row, text="Save", style="Primary.TButton", command=self._save_category).pack()
+        ttk.Button(button_row, text="Save", style="Primary.TButton", command=self._save_category).pack(side="left")
+        ttk.Button(button_row, text="Cancel", style="Secondary.TButton", command=self._close_dialog).pack(
+            side="left", padx=(12, 0)
+        )
 
         self._dialog.columnconfigure(0, weight=1)
         dialog_frame.columnconfigure(0, weight=1)
@@ -156,6 +208,8 @@ class AddCategoryView(tk.Frame):
             self._dialog.grab_release()
             self._dialog.destroy()
         self._dialog = None
+        self._dialog_mode = None
+        self._editing_index = None
         self._dialog_name_var = None
         self._dialog_days_var = None
         self._dialog_description = None
@@ -181,7 +235,11 @@ class AddCategoryView(tk.Frame):
             "description": description,
             "days": days_value,
         }
-        self.categories.append(category)
+        if self._dialog_mode == "edit" and self._editing_index is not None:
+            self.categories[self._editing_index] = category
+        else:
+            self.categories.append(category)
+
         self._persist_categories()
         self._render_category_cards()
         self._close_dialog()
@@ -201,7 +259,7 @@ class AddCategoryView(tk.Frame):
             placeholder.pack(pady=10)
             return
 
-        for category in self.categories:
+        for index, category in enumerate(self.categories):
             card = tk.Frame(
                 self.cards_container,
                 bg=self.card_bg,
@@ -242,12 +300,29 @@ class AddCategoryView(tk.Frame):
             )
             meta_label.pack(anchor="w", pady=(0, 12))
 
+            actions = tk.Frame(card, bg=self.card_bg)
+            actions.pack(anchor="e", pady=(8, 0))
+
             ttk.Button(
-                card,
-                text="Open Category",
+                actions,
+                text="Open",
                 style="Secondary.TButton",
-                command=lambda cat=category: self._open_category(cat),
-            ).pack(anchor="e")
+                command=lambda idx=index: self._open_category(self.categories[idx]),
+            ).pack(side="left", padx=(0, 8))
+
+            ttk.Button(
+                actions,
+                text="Edit",
+                style="Secondary.TButton",
+                command=lambda idx=index: self._handle_edit_category(idx),
+            ).pack(side="left", padx=(0, 8))
+
+            ttk.Button(
+                actions,
+                text="Delete",
+                style="Secondary.TButton",
+                command=lambda idx=index: self._delete_category(idx),
+            ).pack(side="left")
 
     def _open_category(self, category: dict[str, str]) -> None:  # pragma: no cover - placeholder
         messagebox.showinfo(
