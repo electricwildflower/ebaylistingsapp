@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any
+from typing import Any, Callable
 
 import tkinter as tk
 from tkinter import messagebox, ttk
@@ -20,6 +20,7 @@ class AddCategoryView(tk.Frame):
         primary_bg: str,
         text_color: str,
         storage_path: str | None = None,
+        on_categories_changed: Callable[[list[dict[str, str]]], None] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(master, bg=primary_bg, **kwargs)
@@ -35,6 +36,7 @@ class AddCategoryView(tk.Frame):
         self._dialog_name_var: tk.StringVar | None = None
         self._dialog_days_var: tk.StringVar | None = None
         self._dialog_description: tk.Text | None = None
+        self._categories_changed_callback = on_categories_changed
 
         self.search_value = tk.StringVar()
         self.search_value.trace_add("write", self._handle_search_change)
@@ -153,6 +155,7 @@ class AddCategoryView(tk.Frame):
         del self.categories[index]
         self._persist_categories()
         self._render_category_cards()
+        self._notify_categories_changed()
 
     def _open_category_dialog(self, mode: str, index: int | None = None) -> None:
         if self._dialog_backdrop and self._dialog_backdrop.winfo_exists():
@@ -275,6 +278,7 @@ class AddCategoryView(tk.Frame):
 
         self._persist_categories()
         self._render_category_cards()
+        self._notify_categories_changed()
         self._close_dialog()
 
     def _render_category_cards(self) -> None:
@@ -382,6 +386,7 @@ class AddCategoryView(tk.Frame):
         self.storage_path = storage_path
         self._load_categories()
         self._render_category_cards()
+        self._notify_categories_changed()
 
     def _handle_search_change(self, *_: Any) -> None:
         if hasattr(self, "cards_container"):
@@ -450,6 +455,9 @@ class AddCategoryView(tk.Frame):
                     parsed.append({"name": name, "description": description, "days": days or "0"})
         self.categories = parsed
 
+    def get_categories(self) -> list[dict[str, str]]:
+        return [dict(category) for category in self.categories]
+
     def _persist_categories(self) -> None:
         data_path = self._data_file_path()
         if not data_path:
@@ -465,4 +473,8 @@ class AddCategoryView(tk.Frame):
                 f"Unable to save categories data.\n\n{exc}",
                 parent=self.winfo_toplevel(),
             )
+
+    def _notify_categories_changed(self) -> None:
+        if self._categories_changed_callback:
+            self._categories_changed_callback(self.get_categories())
 

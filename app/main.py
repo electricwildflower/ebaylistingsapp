@@ -250,6 +250,7 @@ class EbayListingApp:
             primary_bg=self.primary_bg,
             text_color=self.text_color,
             storage_path=self.storage_path,
+            on_categories_changed=self._update_categories_display,
         )
         self.add_item_frame = tk.Frame(self.content_container, bg=self.primary_bg)
         self.readd_item_frame = tk.Frame(self.content_container, bg=self.primary_bg)
@@ -257,14 +258,7 @@ class EbayListingApp:
         self.end_item_frame = tk.Frame(self.content_container, bg=self.primary_bg)
         self.storage_config_frame = tk.Frame(self.content_container, bg=self.primary_bg)
 
-        hero_title = tk.Label(
-            self.main_frame,
-            text="eBay Listing Manager",
-            font=("Segoe UI Semibold", 26),
-            bg=self.primary_bg,
-            fg=self.text_color,
-        )
-        hero_title.pack(pady=(60, 10))
+        self._build_main_hero_title()
 
         hero_subtitle = tk.Label(
             self.main_frame,
@@ -286,6 +280,8 @@ class EbayListingApp:
             fg=self.text_color,
         )
         card_label.pack()
+
+        self._build_main_categories_section()
 
         item_label = tk.Label(
             self.add_item_frame,
@@ -373,6 +369,8 @@ class EbayListingApp:
             style="Primary.TButton",
         )
         storage_button.pack(pady=(18, 0), fill="x")
+
+        self._render_main_categories(self.add_category_frame.get_categories())
 
         default_base = self._default_storage_base_path()
         self.first_run_frame = FirstRunWizard(
