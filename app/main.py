@@ -170,7 +170,7 @@ class EbayListingApp:
         )
         home_button.pack(side="left", padx=4)
 
-        add_button = ttk.Menubutton(nav_container, text="Add", style="TopNav.TMenubutton", direction="below")
+        add_button = ttk.Menubutton(nav_container, text="Add/Edit", style="TopNav.TMenubutton", direction="below")
         add_menu = tk.Menu(
             add_button,
             tearoff=0,
@@ -182,7 +182,7 @@ class EbayListingApp:
             relief="flat",
             activeborderwidth=0,
         )
-        add_menu.add_command(label="Add a New Category", command=self.show_add_category)
+        add_menu.add_command(label="Add/Edit Categories", command=self.show_add_category)
         add_menu.add_command(label="Add a New Item", command=self.show_add_item)
         add_menu.add_command(label="Re-add an Item", command=self.show_readd_item)
         add_button.configure(menu=add_menu)

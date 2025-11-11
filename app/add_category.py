@@ -28,7 +28,8 @@ class AddCategoryView(tk.Frame):
         self.card_bg = "#FFFFFF"
         self.storage_path = storage_path
         self.categories: list[dict[str, str]] = []
-        self._dialog: tk.Toplevel | None = None
+        self._dialog_backdrop: tk.Frame | None = None
+        self._dialog: tk.Frame | None = None
         self._dialog_mode: str | None = None
         self._editing_index: int | None = None
         self._dialog_name_var: tk.StringVar | None = None
@@ -135,7 +136,7 @@ class AddCategoryView(tk.Frame):
         self._render_category_cards()
 
     def _open_category_dialog(self, mode: str, index: int | None = None) -> None:
-        if self._dialog and self._dialog.winfo_exists():
+        if self._dialog_backdrop and self._dialog_backdrop.winfo_exists():
             self._close_dialog()
 
         category: dict[str, str] | None = None
@@ -144,17 +145,27 @@ class AddCategoryView(tk.Frame):
 
         self._dialog_mode = mode
         self._editing_index = index
-        self._dialog = tk.Toplevel(self)
-        title = "Edit Category" if mode == "edit" else "Add Category"
-        self._dialog.title(title)
-        self._dialog.configure(bg=self.primary_bg)
-        self._dialog.transient(self.winfo_toplevel())
-        self._dialog.grab_set()
-        self._dialog.resizable(False, False)
-        self._dialog.protocol("WM_DELETE_WINDOW", self._close_dialog)
+        self._dialog_backdrop = tk.Frame(self, bg=self.primary_bg)
+        self._dialog_backdrop.place(relx=0, rely=0, relwidth=1, relheight=1)
+        self._dialog_backdrop.lift()
 
-        dialog_frame = tk.Frame(self._dialog, bg=self.primary_bg, padx=24, pady=24)
-        dialog_frame.pack(fill="both", expand=True)
+        wrapper = tk.Frame(self._dialog_backdrop, bg=self.primary_bg)
+        wrapper.pack(expand=True, pady=60)
+
+        title = "Edit Category" if mode == "edit" else "Add Category"
+        header = tk.Label(
+            wrapper,
+            text=title,
+            font=("Segoe UI Semibold", 20),
+            bg=self.primary_bg,
+            fg=self.text_color,
+        )
+        header.pack(pady=(0, 16))
+
+        self._dialog = tk.Frame(wrapper, bg=self.card_bg, padx=24, pady=24)
+        self._dialog.pack()
+
+        dialog_frame = self._dialog
 
         default_name = category["name"] if category else ""
         default_days = category["days"] if category else "30"
@@ -192,7 +203,7 @@ class AddCategoryView(tk.Frame):
         )
         days_spinbox.grid(row=5, column=0, sticky="w", pady=(4, 20))
 
-        button_row = tk.Frame(dialog_frame, bg=self.primary_bg)
+        button_row = tk.Frame(dialog_frame, bg=self.card_bg)
         button_row.grid(row=6, column=0, sticky="e")
 
         ttk.Button(button_row, text="Save", style="Primary.TButton", command=self._save_category).pack(side="left")
@@ -205,8 +216,11 @@ class AddCategoryView(tk.Frame):
 
     def _close_dialog(self) -> None:
         if self._dialog and self._dialog.winfo_exists():
-            self._dialog.grab_release()
             self._dialog.destroy()
+        if self._dialog_backdrop and self._dialog_backdrop.winfo_exists():
+            self._dialog_backdrop.place_forget()
+            self._dialog_backdrop.destroy()
+        self._dialog_backdrop = None
         self._dialog = None
         self._dialog_mode = None
         self._editing_index = None
@@ -223,11 +237,11 @@ class AddCategoryView(tk.Frame):
         days_value = self._dialog_days_var.get().strip()
 
         if not name:
-            messagebox.showerror("Add Category", "Please enter a category name.", parent=self._dialog)
+            messagebox.showerror("Add Category", "Please enter a category name.", parent=self.winfo_toplevel())
             return
 
         if not days_value.isdigit() or int(days_value) <= 0:
-            messagebox.showerror("Add Category", "Please enter a valid number of days.", parent=self._dialog)
+            messagebox.showerror("Add Category", "Please enter a valid number of days.", parent=self.winfo_toplevel())
             return
 
         category = {
