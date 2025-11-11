@@ -188,9 +188,7 @@ class EbayListingApp:
         categories_button.configure(menu=categories_menu)
         categories_button.pack(side="left", padx=4)
 
-        items_button = ttk.Menubutton(
-            nav_container, text="Add/Edit Items", style="TopNav.TMenubutton", direction="below"
-        )
+        items_button = ttk.Menubutton(nav_container, text="Listings", style="TopNav.TMenubutton", direction="below")
         items_menu = tk.Menu(
             items_button,
             tearoff=0,
