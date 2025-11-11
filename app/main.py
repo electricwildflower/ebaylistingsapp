@@ -13,6 +13,11 @@ try:
 except ImportError:
     from firstrun import FirstRunWizard
 
+try:
+    from .add_category import AddCategoryView
+except ImportError:
+    from add_category import AddCategoryView
+
 
 class EbayListingApp:
     def __init__(self) -> None:
@@ -238,7 +243,11 @@ class EbayListingApp:
             toggle_fullscreen_callback=self.toggle_fullscreen_mode,
         )
         self.settings_view.update_toggle_label("Switch to Windowed" if self.is_fullscreen else "Switch to Fullscreen")
-        self.add_category_frame = tk.Frame(self.content_container, bg=self.primary_bg)
+        self.add_category_frame = AddCategoryView(
+            self.content_container,
+            primary_bg=self.primary_bg,
+            text_color=self.text_color,
+        )
         self.add_item_frame = tk.Frame(self.content_container, bg=self.primary_bg)
         self.readd_item_frame = tk.Frame(self.content_container, bg=self.primary_bg)
         self.remove_item_frame = tk.Frame(self.content_container, bg=self.primary_bg)
@@ -274,15 +283,6 @@ class EbayListingApp:
             fg=self.text_color,
         )
         card_label.pack()
-
-        category_label = tk.Label(
-            self.add_category_frame,
-            text="Add Category (placeholder)",
-            font=("Segoe UI Semibold", 18),
-            bg=self.primary_bg,
-            fg=self.text_color,
-        )
-        category_label.pack(pady=40)
 
         item_label = tk.Label(
             self.add_item_frame,
@@ -410,8 +410,7 @@ class EbayListingApp:
         self._show_frame(self.add_category_frame)
 
     def show_add_item(self) -> None:
-        self._show_top_bar()
-        self._show_frame(self.add_item_frame)
+        self.show_add_category()
 
     def show_readd_item(self) -> None:
         self._show_top_bar()
