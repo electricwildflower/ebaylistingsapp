@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import json
+import os
+from typing import Any
+
 import tkinter as tk
 from tkinter import messagebox, ttk
 
@@ -15,12 +19,14 @@ class AddCategoryView(tk.Frame):
         *,
         primary_bg: str,
         text_color: str,
+        storage_path: str | None = None,
         **kwargs,
     ) -> None:
         super().__init__(master, bg=primary_bg, **kwargs)
         self.primary_bg = primary_bg
         self.text_color = text_color
         self.card_bg = "#FFFFFF"
+        self.storage_path = storage_path
         self.categories: list[dict[str, str]] = []
         self._dialog: tk.Toplevel | None = None
         self._dialog_name_var: tk.StringVar | None = None
@@ -29,6 +35,7 @@ class AddCategoryView(tk.Frame):
 
         self.search_value = tk.StringVar()
 
+        self._load_categories()
         self._build_layout()
         self._render_category_cards()
 
@@ -83,6 +90,14 @@ class AddCategoryView(tk.Frame):
         self.cards_container.pack(fill="both", expand=True, pady=(30, 0))
 
     def _handle_add_category(self) -> None:
+        if not self.storage_path:
+            messagebox.showerror(
+                "Add Category",
+                "Please configure a storage location before adding categories.",
+                parent=self.winfo_toplevel(),
+            )
+            return
+
         if self._dialog and self._dialog.winfo_exists():
             self._dialog.lift()
             self._dialog.focus_force()
@@ -167,6 +182,7 @@ class AddCategoryView(tk.Frame):
             "days": days_value,
         }
         self.categories.append(category)
+        self._persist_categories()
         self._render_category_cards()
         self._close_dialog()
 
@@ -239,4 +255,60 @@ class AddCategoryView(tk.Frame):
             f"The category \"{category['name']}\" will open listings soon.",
             parent=self.winfo_toplevel(),
         )
+
+    def set_storage_path(self, storage_path: str) -> None:
+        self.storage_path = storage_path
+        self._load_categories()
+        self._render_category_cards()
+
+    def _data_file_path(self) -> str | None:
+        if not self.storage_path:
+            return None
+        return os.path.join(self.storage_path, "categories.json")
+
+    def _load_categories(self) -> None:
+        data_path = self._data_file_path()
+        if not data_path or not os.path.exists(data_path):
+            self.categories = []
+            return
+
+        try:
+            with open(data_path, "r", encoding="utf-8") as file:
+                raw_data: Any = json.load(file)
+        except (OSError, json.JSONDecodeError) as exc:
+            messagebox.showwarning(
+                "Categories",
+                f"Unable to load categories data.\n\n{exc}",
+                parent=self.winfo_toplevel(),
+            )
+            self.categories = []
+            return
+
+        parsed: list[dict[str, str]] = []
+        if isinstance(raw_data, list):
+            for entry in raw_data:
+                if not isinstance(entry, dict):
+                    continue
+                name = str(entry.get("name", "")).strip()
+                description = str(entry.get("description", "")).strip()
+                days = str(entry.get("days", "")).strip()
+                if name:
+                    parsed.append({"name": name, "description": description, "days": days or "0"})
+        self.categories = parsed
+
+    def _persist_categories(self) -> None:
+        data_path = self._data_file_path()
+        if not data_path:
+            return
+
+        try:
+            os.makedirs(os.path.dirname(data_path), exist_ok=True)
+            with open(data_path, "w", encoding="utf-8") as file:
+                json.dump(self.categories, file, indent=2)
+        except OSError as exc:
+            messagebox.showerror(
+                "Categories",
+                f"Unable to save categories data.\n\n{exc}",
+                parent=self.winfo_toplevel(),
+            )
 

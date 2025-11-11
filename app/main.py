@@ -247,6 +247,7 @@ class EbayListingApp:
             self.content_container,
             primary_bg=self.primary_bg,
             text_color=self.text_color,
+            storage_path=self.storage_path,
         )
         self.add_item_frame = tk.Frame(self.content_container, bg=self.primary_bg)
         self.readd_item_frame = tk.Frame(self.content_container, bg=self.primary_bg)
@@ -479,6 +480,8 @@ class EbayListingApp:
             return False
 
         self.storage_path = config_dir
+        if hasattr(self, "add_category_frame"):
+            self.add_category_frame.set_storage_path(config_dir)
         if hasattr(self, "storage_value"):
             self.storage_value.set(f"Current storage folder:\n{config_dir}")
         self._save_config()
