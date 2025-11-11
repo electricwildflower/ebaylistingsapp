@@ -40,7 +40,7 @@ class EbayListingApp:
         self.root.option_add("*Menu.relief", "flat")
         self.root.option_add("*Menu.activeBorderWidth", 0)
 
-        self.config_path = os.path.join(os.path.dirname(__file__), "app_config.json")
+        self.config_path = self._resolve_config_path()
         self.config = self._load_config()
         self.is_fullscreen = bool(self.config.get("fullscreen", False))
         self.storage_path: str | None = self.config.get("storage_path")
@@ -500,6 +500,17 @@ class EbayListingApp:
         return {}
 
     def _save_config(self) -> None:
+        config_dir = os.path.dirname(self.config_path)
+        try:
+            os.makedirs(config_dir, exist_ok=True)
+        except OSError as exc:
+            messagebox.showwarning(
+                "Settings",
+                f"Unable to create settings folder.\n\n{exc}",
+                parent=self.root,
+            )
+            return
+
         data = {
             "fullscreen": self.is_fullscreen,
             "storage_path": self.storage_path,
@@ -519,6 +530,12 @@ class EbayListingApp:
         if os.path.isdir(documents):
             return documents
         return os.path.expanduser("~")
+
+    def _resolve_config_path(self) -> str:
+        documents = os.path.join(os.path.expanduser("~"), "Documents")
+        base_dir = documents if os.path.isdir(documents) else os.path.expanduser("~")
+        config_dir = os.path.join(base_dir, "ebaylistingapp")
+        return os.path.join(config_dir, "app_config.json")
 
     def _on_first_run_complete(self) -> None:
         if not self.storage_path:
