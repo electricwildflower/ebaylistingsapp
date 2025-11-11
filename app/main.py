@@ -545,6 +545,113 @@ class EbayListingApp:
             return
         self.show_main()
 
+    def _build_main_hero_title(self) -> None:
+        if hasattr(self, "hero_title_frame") and self.hero_title_frame.winfo_exists():
+            self.hero_title_frame.destroy()
+
+        self.hero_title_frame = tk.Frame(self.main_frame, bg=self.primary_bg)
+        self.hero_title_frame.pack(pady=(60, 10))
+
+        palette = ("#E53238", "#0064D2", "#F5AF02", "#86B817")
+        title_text = "eBay Listing Manager"
+        palette_index = 0
+
+        for char in title_text:
+            if char == " ":
+                spacer = tk.Label(self.hero_title_frame, text=" ", font=("Segoe UI Semibold", 26), bg=self.primary_bg)
+                spacer.pack(side="left")
+                continue
+
+            color = palette[palette_index % len(palette)]
+            label = tk.Label(
+                self.hero_title_frame,
+                text=char,
+                font=("Segoe UI Semibold", 26),
+                bg=self.primary_bg,
+                fg=color,
+            )
+            label.pack(side="left")
+            palette_index += 1
+
+    def _build_main_categories_section(self) -> None:
+        self.main_categories_section = tk.Frame(self.main_frame, bg=self.primary_bg)
+        self.main_categories_section.pack(fill="x", padx=40, pady=(30, 0))
+
+        header = tk.Label(
+            self.main_categories_section,
+            text="Categories",
+            font=("Segoe UI Semibold", 20),
+            bg=self.primary_bg,
+            fg=self.text_color,
+        )
+        header.pack(anchor="w")
+
+        self.main_categories_container = tk.Frame(self.main_categories_section, bg=self.primary_bg)
+        self.main_categories_container.pack(fill="x", pady=(12, 0))
+
+    def _render_main_categories(self, categories: list[dict[str, str]]) -> None:
+        for child in self.main_categories_container.winfo_children():
+            child.destroy()
+
+        if not categories:
+            placeholder = tk.Label(
+                self.main_categories_container,
+                text="No categories to display yet.",
+                font=("Segoe UI", 12),
+                bg=self.primary_bg,
+                fg="#5A6D82",
+            )
+            placeholder.pack(anchor="w")
+            return
+
+        for category in categories:
+            card = tk.Frame(
+                self.main_categories_container,
+                bg=self.card_bg,
+                highlightthickness=1,
+                highlightbackground="#D7E3F5",
+                padx=16,
+                pady=14,
+            )
+            card.pack(fill="x", pady=(0, 12))
+
+            name_label = tk.Label(
+                card,
+                text=category.get("name", ""),
+                font=("Segoe UI Semibold", 14),
+                bg=self.card_bg,
+                fg=self.text_color,
+            )
+            name_label.pack(anchor="w")
+
+            description = category.get("description", "")
+            if description:
+                description_label = tk.Label(
+                    card,
+                    text=description,
+                    font=("Segoe UI", 11),
+                    bg=self.card_bg,
+                    fg="#41566F",
+                    wraplength=480,
+                    justify="left",
+                )
+                description_label.pack(anchor="w", pady=(4, 6))
+
+            days = category.get("days")
+            if days:
+                meta_label = tk.Label(
+                    card,
+                    text=f"Duration: {days} day(s)",
+                    font=("Segoe UI", 10),
+                    bg=self.card_bg,
+                    fg="#6F7F92",
+                )
+                meta_label.pack(anchor="w")
+
+    def _update_categories_display(self, categories: list[dict[str, str]]) -> None:
+        if hasattr(self, "main_categories_container"):
+            self._render_main_categories(categories)
+
     def _show_top_bar(self) -> None:
         if not getattr(self, "top_bar_visible", False):
             self.top_bar.pack(side="top", fill="x")

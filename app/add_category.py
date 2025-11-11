@@ -45,6 +45,7 @@ class AddCategoryView(tk.Frame):
         self._load_categories()
         self._build_layout()
         self._render_category_cards()
+        self._notify_categories_changed()
 
     def _build_layout(self) -> None:
         container = tk.Frame(self, bg=self.primary_bg)
