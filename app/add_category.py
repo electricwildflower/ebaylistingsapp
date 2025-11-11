@@ -100,11 +100,8 @@ class AddCategoryView(tk.Frame):
             highlightthickness=0,
             borderwidth=0,
         )
-        scrollbar = ttk.Scrollbar(container, orient="vertical", command=self.cards_canvas.yview)
-        self.cards_canvas.configure(yscrollcommand=scrollbar.set)
 
         self.cards_canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
 
         self.cards_container = tk.Frame(self.cards_canvas, bg=self.primary_bg)
         self._cards_window_id = self.cards_canvas.create_window((0, 0), window=self.cards_container, anchor="nw")
