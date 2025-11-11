@@ -170,9 +170,11 @@ class EbayListingApp:
         )
         home_button.pack(side="left", padx=4)
 
-        add_button = ttk.Menubutton(nav_container, text="Add/Edit", style="TopNav.TMenubutton", direction="below")
-        add_menu = tk.Menu(
-            add_button,
+        categories_button = ttk.Menubutton(
+            nav_container, text="Categories", style="TopNav.TMenubutton", direction="below"
+        )
+        categories_menu = tk.Menu(
+            categories_button,
             tearoff=0,
             background="#FFFFFF",
             foreground=self.text_color,
@@ -182,15 +184,15 @@ class EbayListingApp:
             relief="flat",
             activeborderwidth=0,
         )
-        add_menu.add_command(label="Add/Edit Categories", command=self.show_add_category)
-        add_menu.add_command(label="Add a New Item", command=self.show_add_item)
-        add_menu.add_command(label="Re-add an Item", command=self.show_readd_item)
-        add_button.configure(menu=add_menu)
-        add_button.pack(side="left", padx=4)
+        categories_menu.add_command(label="Add/Edit/Delete Categories", command=self.show_add_category)
+        categories_button.configure(menu=categories_menu)
+        categories_button.pack(side="left", padx=4)
 
-        remove_button = ttk.Menubutton(nav_container, text="Remove", style="TopNav.TMenubutton", direction="below")
-        remove_menu = tk.Menu(
-            remove_button,
+        items_button = ttk.Menubutton(
+            nav_container, text="Add/Edit Items", style="TopNav.TMenubutton", direction="below"
+        )
+        items_menu = tk.Menu(
+            items_button,
             tearoff=0,
             background="#FFFFFF",
             foreground=self.text_color,
@@ -200,10 +202,12 @@ class EbayListingApp:
             relief="flat",
             activeborderwidth=0,
         )
-        remove_menu.add_command(label="Remove an Item", command=self.show_remove_item)
-        remove_menu.add_command(label="End an Item", command=self.show_end_item)
-        remove_button.configure(menu=remove_menu)
-        remove_button.pack(side="left", padx=4)
+        items_menu.add_command(label="Add a New Item", command=self.show_add_item)
+        items_menu.add_command(label="Re-add an Item", command=self.show_readd_item)
+        items_menu.add_command(label="Remove an Item", command=self.show_remove_item)
+        items_menu.add_command(label="End an Item", command=self.show_end_item)
+        items_button.configure(menu=items_menu)
+        items_button.pack(side="left", padx=4)
 
         settings_button = ttk.Menubutton(nav_container, text="Settings", style="TopNav.TMenubutton", direction="below")
         settings_menu = tk.Menu(
