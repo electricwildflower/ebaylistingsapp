@@ -37,6 +37,8 @@ class AddCategoryView(tk.Frame):
         self._dialog_description: tk.Text | None = None
 
         self.search_value = tk.StringVar()
+        self.search_value.trace_add("write", self._handle_search_change)
+        self._is_mousewheel_bound = False
 
         self._load_categories()
         self._build_layout()
@@ -89,8 +91,28 @@ class AddCategoryView(tk.Frame):
         ).pack()
 
     def _build_categories_container(self, parent: tk.Frame) -> None:
-        self.cards_container = tk.Frame(parent, bg=self.primary_bg)
-        self.cards_container.pack(fill="both", expand=True, pady=(30, 0))
+        container = tk.Frame(parent, bg=self.primary_bg)
+        container.pack(fill="both", expand=True, pady=(30, 0))
+
+        self.cards_canvas = tk.Canvas(
+            container,
+            bg=self.primary_bg,
+            highlightthickness=0,
+            borderwidth=0,
+        )
+        scrollbar = ttk.Scrollbar(container, orient="vertical", command=self.cards_canvas.yview)
+        self.cards_canvas.configure(yscrollcommand=scrollbar.set)
+
+        self.cards_canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        self.cards_container = tk.Frame(self.cards_canvas, bg=self.primary_bg)
+        self._cards_window_id = self.cards_canvas.create_window((0, 0), window=self.cards_container, anchor="nw")
+
+        self.cards_container.bind("<Configure>", self._sync_scroll_region)
+        self.cards_canvas.bind("<Enter>", self._bind_mousewheel)
+        self.cards_canvas.bind("<Leave>", self._unbind_mousewheel)
+        self.cards_canvas.bind("<Configure>", self._match_canvas_width)
 
     def _handle_add_category(self) -> None:
         if not self.storage_path:
@@ -262,10 +284,24 @@ class AddCategoryView(tk.Frame):
         for child in self.cards_container.winfo_children():
             child.destroy()
 
-        if not self.categories:
+        filter_text = self.search_value.get().strip().lower()
+        if filter_text:
+            filtered = [
+                (index, category)
+                for index, category in enumerate(self.categories)
+                if filter_text in category["name"].lower() or filter_text in category["description"].lower()
+            ]
+        else:
+            filtered = list(enumerate(self.categories))
+
+        if not filtered:
             placeholder = tk.Label(
                 self.cards_container,
-                text="No categories yet. Click \"Add a Category\" to create one.",
+                text=(
+                    "No categories match your search."
+                    if filter_text
+                    else "No categories yet. Click \"Add a Category\" to create one."
+                ),
                 font=("Segoe UI", 12),
                 bg=self.primary_bg,
                 fg="#5A6D82",
@@ -273,7 +309,7 @@ class AddCategoryView(tk.Frame):
             placeholder.pack(pady=10)
             return
 
-        for index, category in enumerate(self.categories):
+        for original_index, category in filtered:
             card = tk.Frame(
                 self.cards_container,
                 bg=self.card_bg,
@@ -321,21 +357,21 @@ class AddCategoryView(tk.Frame):
                 actions,
                 text="Open",
                 style="Secondary.TButton",
-                command=lambda idx=index: self._open_category(self.categories[idx]),
+                command=lambda cat=category: self._open_category(cat),
             ).pack(side="left", padx=(0, 8))
 
             ttk.Button(
                 actions,
                 text="Edit",
                 style="Secondary.TButton",
-                command=lambda idx=index: self._handle_edit_category(idx),
+                command=lambda idx=original_index: self._handle_edit_category(idx),
             ).pack(side="left", padx=(0, 8))
 
             ttk.Button(
                 actions,
                 text="Delete",
                 style="Secondary.TButton",
-                command=lambda idx=index: self._delete_category(idx),
+                command=lambda idx=original_index: self._delete_category(idx),
             ).pack(side="left")
 
     def _open_category(self, category: dict[str, str]) -> None:  # pragma: no cover - placeholder
@@ -349,6 +385,38 @@ class AddCategoryView(tk.Frame):
         self.storage_path = storage_path
         self._load_categories()
         self._render_category_cards()
+
+    def _handle_search_change(self, *_: Any) -> None:
+        if hasattr(self, "cards_container"):
+            self._render_category_cards()
+
+    def _sync_scroll_region(self, _: Any) -> None:
+        self.cards_canvas.configure(scrollregion=self.cards_canvas.bbox("all"))
+
+    def _match_canvas_width(self, event: Any) -> None:
+        self.cards_canvas.itemconfigure(self._cards_window_id, width=event.width)
+
+    def _bind_mousewheel(self, _: Any) -> None:
+        if self._is_mousewheel_bound:
+            return
+        self.cards_canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        self.cards_canvas.bind_all("<Button-4>", self._on_mousewheel)
+        self.cards_canvas.bind_all("<Button-5>", self._on_mousewheel)
+        self._is_mousewheel_bound = True
+
+    def _unbind_mousewheel(self, _: Any) -> None:
+        if not self._is_mousewheel_bound:
+            return
+        self.cards_canvas.unbind_all("<MouseWheel>")
+        self.cards_canvas.unbind_all("<Button-4>")
+        self.cards_canvas.unbind_all("<Button-5>")
+        self._is_mousewheel_bound = False
+
+    def _on_mousewheel(self, event: Any) -> None:
+        if event.num == 4 or (hasattr(event, "delta") and event.delta > 0):
+            self.cards_canvas.yview_scroll(-1, "units")
+        elif event.num == 5 or (hasattr(event, "delta") and event.delta < 0):
+            self.cards_canvas.yview_scroll(1, "units")
 
     def _data_file_path(self) -> str | None:
         if not self.storage_path:
