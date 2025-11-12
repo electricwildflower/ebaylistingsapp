@@ -337,6 +337,8 @@ class EbayListingApp:
         )
         heading.pack(pady=(20, 10))
 
+        self._build_global_search()
+
         self.dashboard_container = tk.Frame(self.main_frame, bg=self.primary_bg)
         self.dashboard_container.pack(fill="both", expand=True, padx=40, pady=(30, 40))
         self.dashboard_container.columnconfigure(0, weight=2)
@@ -642,15 +644,29 @@ class EbayListingApp:
 
         header = tk.Label(
             self.main_recent_section,
-            text="Recently Added Items",
+            text="Items Overview",
             font=("Segoe UI Semibold", 20),
             bg=self.primary_bg,
             fg=self.text_color,
         )
         header.pack(anchor="w")
 
-        self.main_recent_container = tk.Frame(self.main_recent_section, bg=self.primary_bg)
-        self.main_recent_container.pack(fill="both", expand=True, pady=(12, 0))
+        notebook_container = tk.Frame(self.main_recent_section, bg=self.primary_bg)
+        notebook_container.pack(fill="both", expand=True, pady=(12, 0))
+
+        self.main_recent_notebook = ttk.Notebook(notebook_container)
+        self.main_recent_notebook.pack(fill="both", expand=True)
+
+        self.recent_items_tab = tk.Frame(self.main_recent_notebook, bg=self.primary_bg)
+        self.ended_items_tab = tk.Frame(self.main_recent_notebook, bg=self.primary_bg)
+        self.main_recent_notebook.add(self.recent_items_tab, text="Recently Added")
+        self.main_recent_notebook.add(self.ended_items_tab, text="Items Ended")
+
+        self.main_recent_container = tk.Frame(self.recent_items_tab, bg=self.primary_bg)
+        self.main_recent_container.pack(fill="both", expand=True, padx=4, pady=4)
+
+        self.main_ended_container = tk.Frame(self.ended_items_tab, bg=self.primary_bg)
+        self.main_ended_container.pack(fill="both", expand=True, padx=4, pady=4)
 
     def _render_main_categories(self, categories: list[dict[str, str]]) -> None:
         for child in self.main_categories_container.winfo_children():
@@ -744,95 +760,128 @@ class EbayListingApp:
     def _update_categories_display(self, categories: list[dict[str, str]]) -> None:
         if hasattr(self, "main_categories_container"):
             self._render_main_categories(categories)
+        if hasattr(self, "global_search_var"):
+            self._perform_global_search(self.global_search_var.get())
 
     def _render_recent_items(self) -> None:
-        if not hasattr(self, "main_recent_container"):
+        if not hasattr(self, "main_recent_container") or not hasattr(self, "main_ended_container"):
             return
 
-        for child in self.main_recent_container.winfo_children():
-            child.destroy()
+        for container in (self.main_recent_container, self.main_ended_container):
+            for child in container.winfo_children():
+                child.destroy()
 
-        if not self.items:
-            placeholder = tk.Label(
+        active_items = [
+            item for item in self.items if (item.get("status") or "active").lower() != "ended"
+        ]
+        recent_items = list(reversed(active_items[-10:]))
+        if not recent_items:
+            tk.Label(
                 self.main_recent_container,
                 text="No items have been added yet.",
                 font=("Segoe UI", 12),
                 bg=self.primary_bg,
                 fg="#5A6D82",
-            )
-            placeholder.pack(anchor="w")
-            return
+            ).pack(anchor="w")
+        else:
+            for item in recent_items:
+                self._render_item_card(self.main_recent_container, item, ended=False)
 
-        recent_items = list(reversed(self.items[-10:]))
-        for item in recent_items:
-            card = tk.Frame(
-                self.main_recent_container,
-                bg=self.card_bg,
-                highlightthickness=1,
-                highlightbackground="#D7E3F5",
-                padx=16,
-                pady=12,
-            )
-            card.pack(fill="x", pady=(0, 10))
+        ended_items = [
+            item for item in self.items if (item.get("status") or "active").lower() == "ended"
+        ]
+        ended_items.sort(key=lambda itm: abs(self._days_left(itm) or 0))
+        ended_items = ended_items[:10]
+        if not ended_items:
+            tk.Label(
+                self.main_ended_container,
+                text="No ended items.",
+                font=("Segoe UI", 12),
+                bg=self.primary_bg,
+                fg="#5A6D82",
+            ).pack(anchor="w")
+        else:
+            for item in ended_items:
+                self._render_item_card(self.main_ended_container, item, ended=True)
 
-            header = tk.Frame(card, bg=self.card_bg)
-            header.pack(fill="x")
+    def _render_item_card(self, container: tk.Frame, item: dict[str, Any], *, ended: bool) -> None:
+        card = tk.Frame(
+            container,
+            bg=self.card_bg,
+            highlightthickness=1,
+            highlightbackground="#D7E3F5",
+            padx=16,
+            pady=12,
+        )
+        card.pack(fill="x", pady=(0, 10))
 
-            name = item.get("name") or item.get("description", "Item")
+        header = tk.Frame(card, bg=self.card_bg)
+        header.pack(fill="x")
+
+        name = item.get("name") or item.get("description", "Item")
+        tk.Label(
+            header,
+            text=name,
+            font=("Segoe UI Semibold", 13),
+            bg=self.card_bg,
+            fg=self.text_color,
+        ).pack(side="left")
+
+        days_left = self._days_left(item)
+        if ended:
+            ended_text = "Ended"
+            if days_left is not None and days_left < 0:
+                ended_text = f"Ended {abs(days_left)} day(s) ago"
             tk.Label(
                 header,
-                text=name,
-                font=("Segoe UI Semibold", 13),
+                text=ended_text,
+                font=("Segoe UI Semibold", 11),
                 bg=self.card_bg,
-                fg=self.text_color,
-            ).pack(side="left")
+                fg="#C62828",
+            ).pack(side="right")
+        elif days_left is not None:
+            tk.Label(
+                header,
+                text=f"{max(days_left, 0)} day(s) left",
+                font=("Segoe UI Semibold", 11),
+                bg=self.card_bg,
+                fg="#1E88E5" if days_left > 0 else "#C62828",
+            ).pack(side="right")
 
-            status = (item.get("status") or "active").lower()
-            days_left = self._days_left(item)
-            if status == "ended":
-                tk.Label(
-                    header,
-                    text="Ended",
-                    font=("Segoe UI Semibold", 11),
-                    bg=self.card_bg,
-                    fg="#C62828",
-                ).pack(side="right")
-            elif days_left is not None:
-                tk.Label(
-                    header,
-                    text=f"{max(days_left, 0)} day(s) left",
-                    font=("Segoe UI Semibold", 11),
-                    bg=self.card_bg,
-                    fg="#1E88E5" if days_left > 0 else "#C62828",
-                ).pack(side="right")
+        details = []
+        if item.get("category"):
+            details.append(f"Category: {item['category']}")
+        if item.get("date_added"):
+            details.append(f"Added: {item['date_added']}")
+        if item.get("end_date"):
+            details.append(f"End: {item['end_date']}")
+        if details:
+            tk.Label(
+                card,
+                text=" • ".join(details),
+                font=("Segoe UI", 10),
+                bg=self.card_bg,
+                fg="#41566F",
+            ).pack(anchor="w", pady=(4, 4))
 
-            details = []
-            if item.get("category"):
-                details.append(f"Category: {item['category']}")
-            if item.get("date_added"):
-                details.append(f"Added: {item['date_added']}")
-            if item.get("end_date"):
-                details.append(f"End: {item['end_date']}")
-            if details:
-                tk.Label(
-                    card,
-                    text=" • ".join(details),
-                    font=("Segoe UI", 10),
-                    bg=self.card_bg,
-                    fg="#41566F",
-                ).pack(anchor="w", pady=(4, 4))
+        notes = item.get("notes")
+        if notes:
+            tk.Label(
+                card,
+                text=f"Notes: {notes}",
+                font=("Segoe UI", 10),
+                bg=self.card_bg,
+                fg="#60738A",
+                wraplength=420,
+                justify="left",
+            ).pack(anchor="w")
 
-            notes = item.get("notes")
-            if notes:
-                tk.Label(
-                    card,
-                    text=f"Notes: {notes}",
-                    font=("Segoe UI", 10),
-                    bg=self.card_bg,
-                    fg="#60738A",
-                    wraplength=420,
-                    justify="left",
-                ).pack(anchor="w")
+        ttk.Button(
+            card,
+            text="Open",
+            style="Secondary.TButton",
+            command=lambda item_id=item.get("id"): self._open_item_details(item_id),
+        ).pack(anchor="e", pady=(8, 0))
 
     def _days_left(self, item: dict[str, Any]) -> int | None:
         end = item.get("end_date")
@@ -854,6 +903,8 @@ class EbayListingApp:
             self.end_item_frame.set_items(items)
         if hasattr(self, "add_category_frame"):
             self.add_category_frame.refresh_open_category_items()
+        if hasattr(self, "global_search_var"):
+            self._perform_global_search(self.global_search_var.get())
 
     def _edit_item(self, item_id: str, restore: bool = False) -> None:
         self._show_top_bar()
@@ -913,6 +964,160 @@ class EbayListingApp:
         if getattr(self, "top_bar_visible", False):
             self.top_bar.pack_forget()
             self.top_bar_visible = False
+
+    def _build_global_search(self) -> None:
+        search_wrapper = tk.Frame(self.main_frame, bg=self.primary_bg)
+        search_wrapper.pack(fill="x", padx=40, pady=(0, 20))
+
+        tk.Label(
+            search_wrapper,
+            text="Search across categories and items",
+            font=("Segoe UI", 11),
+            bg=self.primary_bg,
+            fg=self.text_color,
+        ).pack(anchor="w")
+
+        entry_row = tk.Frame(search_wrapper, bg=self.primary_bg)
+        entry_row.pack(fill="x", pady=(6, 0))
+
+        self.global_search_var = tk.StringVar()
+        search_entry = ttk.Entry(entry_row, textvariable=self.global_search_var, width=50)
+        search_entry.pack(side="left", fill="x", expand=True)
+        search_entry.bind("<Return>", lambda _: self._perform_global_search(self.global_search_var.get()))
+        ttk.Button(
+            entry_row,
+            text="Search",
+            style="Secondary.TButton",
+            command=lambda: self._perform_global_search(self.global_search_var.get()),
+        ).pack(side="left", padx=(8, 0))
+
+        self.global_search_results = tk.Frame(search_wrapper, bg=self.primary_bg)
+        self.global_search_results.pack(fill="x", pady=(12, 0))
+
+        self.global_search_var.trace_add("write", self._handle_global_search_update)
+        self._perform_global_search("")
+
+    def _handle_global_search_update(self, *_: Any) -> None:
+        # Only auto-refresh when query is empty or reasonably long
+        query = self.global_search_var.get()
+        if not query or len(query) >= 2:
+            self._perform_global_search(query)
+
+    def _clear_global_search_results(self) -> None:
+        for child in self.global_search_results.winfo_children():
+            child.destroy()
+
+    def _perform_global_search(self, query: str) -> None:
+        if not hasattr(self, "global_search_results"):
+            return
+
+        query = (query or "").strip().lower()
+        self._clear_global_search_results()
+
+        results: list[tuple[str, dict[str, Any]]] = []
+
+        categories = self.add_category_frame.get_categories() if hasattr(self, "add_category_frame") else []
+        items = self.add_item_frame.get_items() if hasattr(self, "add_item_frame") else []
+
+        if query:
+            for category in categories:
+                if query in category.get("name", "").lower() or query in category.get("description", "").lower():
+                    results.append(("category", category))
+
+            for item in items:
+                if (
+                    query in (item.get("name") or "").lower()
+                    or query in (item.get("description") or "").lower()
+                    or query in (item.get("notes") or "").lower()
+                ):
+                    results.append(("item", item))
+        else:
+            # default results show top few categories and items
+            results.extend(("category", category) for category in categories[:5])
+            results.extend(("item", item) for item in items[:5])
+
+        if not results:
+            tk.Label(
+                self.global_search_results,
+                text="No matches found.",
+                font=("Segoe UI", 11),
+                bg=self.primary_bg,
+                fg="#5A6D82",
+            ).pack(anchor="w")
+            return
+
+        for result_type, payload in results[:12]:
+            card = tk.Frame(
+                self.global_search_results,
+                bg=self.card_bg,
+                highlightthickness=1,
+                highlightbackground="#D7E3F5",
+                padx=14,
+                pady=10,
+            )
+            card.pack(fill="x", pady=(0, 8))
+
+            if result_type == "category":
+                name = payload.get("name", "Category")
+                tk.Label(
+                    card,
+                    text=f"Category • {name}",
+                    font=("Segoe UI Semibold", 12),
+                    bg=self.card_bg,
+                    fg=self.text_color,
+                ).pack(anchor="w")
+
+                summary = payload.get("description") or ""
+                if summary:
+                    tk.Label(
+                        card,
+                        text=summary,
+                        font=("Segoe UI", 10),
+                        bg=self.card_bg,
+                        fg="#41566F",
+                        wraplength=460,
+                        justify="left",
+                    ).pack(anchor="w", pady=(4, 6))
+
+                ttk.Button(
+                    card,
+                    text="Open Category",
+                    style="Secondary.TButton",
+                    command=lambda cat=dict(payload): self._open_category_from_main(cat),
+                ).pack(anchor="e")
+            else:
+                name = payload.get("name") or payload.get("description", "Item")
+                tk.Label(
+                    card,
+                    text=f"Item • {name}",
+                    font=("Segoe UI Semibold", 12),
+                    bg=self.card_bg,
+                    fg=self.text_color,
+                ).pack(anchor="w")
+
+                details = []
+                if payload.get("category"):
+                    details.append(f"Category: {payload['category']}")
+                if payload.get("date_added"):
+                    details.append(f"Added: {payload['date_added']}")
+                if payload.get("end_date"):
+                    details.append(f"End: {payload['end_date']}")
+                status = (payload.get("status") or "active").capitalize()
+                details.append(f"Status: {status}")
+                tk.Label(
+                    card,
+                    text=" • ".join(details),
+                    font=("Segoe UI", 10),
+                    bg=self.card_bg,
+                    fg="#41566F",
+                ).pack(anchor="w", pady=(4, 4))
+
+                ttk.Button(
+                    card,
+                    text="Open Item",
+                    style="Secondary.TButton",
+                    command=lambda item_id=payload.get("id"): self._open_item_details(item_id),
+                ).pack(anchor="e")
 
 
 if __name__ == "__main__":

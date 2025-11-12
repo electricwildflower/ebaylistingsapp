@@ -61,6 +61,7 @@ class AddCategoryView(tk.Frame):
         self._dialog_images: list[tk.PhotoImage] = []
         self._dialog_image_cache: dict[str, tk.PhotoImage] = {}
         self._current_dialog_category: str | None = None
+        self._dialog_search_var: tk.StringVar | None = None
 
         self.search_value = tk.StringVar()
         self.search_value.trace_add("write", self._handle_search_change)
@@ -278,6 +279,7 @@ class AddCategoryView(tk.Frame):
         self._dialog_images.clear()
         self._dialog_image_cache.clear()
         self._current_dialog_category = None
+        self._dialog_search_var = None
 
     def _save_category(self) -> None:
         if not (self._dialog_name_var and self._dialog_days_var and self._dialog_description):
@@ -426,6 +428,20 @@ class AddCategoryView(tk.Frame):
         )
         header.pack(pady=(0, 16))
 
+        search_wrapper = tk.Frame(wrapper, bg=self.primary_bg)
+        search_wrapper.pack(fill="x", pady=(0, 8))
+        tk.Label(
+            search_wrapper,
+            text="Search items",
+            font=("Segoe UI", 11),
+            bg=self.primary_bg,
+            fg=self.text_color,
+        ).pack()
+        self._dialog_search_var = tk.StringVar()
+        search_entry = ttk.Entry(search_wrapper, textvariable=self._dialog_search_var, width=36)
+        search_entry.pack()
+        self._dialog_search_var.trace_add("write", lambda *_: self._render_dialog_items())
+
         self._dialog = tk.Frame(wrapper, bg=self.card_bg, padx=24, pady=24)
         self._dialog.pack()
 
@@ -548,6 +564,15 @@ class AddCategoryView(tk.Frame):
         self._dialog_images.clear()
 
         items = self._get_items_for_current_category()
+        query = (self._dialog_search_var.get().strip().lower() if self._dialog_search_var else "")
+        if query:
+            items = [
+                item
+                for item in items
+                if query in (item.get("name") or "").lower()
+                or query in (item.get("description") or "").lower()
+                or query in (item.get("notes") or "").lower()
+            ]
         if not items:
             tk.Label(
                 self._dialog_items_container,
