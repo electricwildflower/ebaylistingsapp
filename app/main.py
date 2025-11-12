@@ -7,45 +7,42 @@ from tkinter import filedialog, messagebox, ttk
 
 try:
     from .settings_view import SettingsView
-except ImportError:
+except ImportError:  # pragma: no cover
     from settings_view import SettingsView
 
 try:
     from .firstrun import FirstRunWizard
-except ImportError:
+except ImportError:  # pragma: no cover
     from firstrun import FirstRunWizard
 
 try:
     from .add_category import AddCategoryView
-except ImportError:
+except ImportError:  # pragma: no cover
     from add_category import AddCategoryView
 
 try:
     from .add_item import AddItemView
-except ImportError:
+except ImportError:  # pragma: no cover
     from add_item import AddItemView
 
 try:
-    from .end_items import EndItemsView
-except ImportError:
-    from end_items import EndItemsView
+    from .items_added import ItemsAddedView
+except ImportError:  # pragma: no cover
+    from items_added import ItemsAddedView
 
 try:
-    from .items_added import ItemsAddedView
-except ImportError:
-    from items_added import ItemsAddedView
+    from .end_items import EndItemsView
+except ImportError:  # pragma: no cover
+    from end_items import EndItemsView
 
 
 class EbayListingApp:
     def __init__(self) -> None:
         self.root = tk.Tk()
-        self.root.title("Ebay Listing App")
-        self.default_geometry = "800x600"
+        self.root.title("eBay Listing App")
+        self.default_geometry = "1100x760"
         self.root.geometry(self.default_geometry)
-        self.root.resizable(False, False)
-        self.is_fullscreen = False
-        self._main_mousewheel_bound = False
-        self.items: list[dict[str, Any]] = []
+        self.root.minsize(960, 640)
 
         self.primary_bg = "#F2F7FF"
         self.accent_color = "#1E88E5"
@@ -53,27 +50,30 @@ class EbayListingApp:
         self.card_bg = "#FFFFFF"
         self.text_color = "#0A2239"
 
-        self.root.configure(bg=self.primary_bg)
-        self.root.option_add("*Font", "{Segoe UI} 11")
-        self.root.option_add("*Menu.borderWidth", 0)
-        self.root.option_add("*Menu.relief", "flat")
-        self.root.option_add("*Menu.activeBorderWidth", 0)
+        self.items: list[dict[str, Any]] = []
+
+        self._configure_styles()
 
         self.config_path = self._resolve_config_path()
         self.config = self._load_config()
         self.is_fullscreen = bool(self.config.get("fullscreen", False))
         self.storage_path: str | None = self.config.get("storage_path")
 
-        self._configure_styles()
         self._create_top_bar()
         self._create_content_container()
         self._create_frames()
         self._apply_window_mode()
+
         if self.storage_path:
+            self.add_item_frame.set_storage_path(self.storage_path)
+            self.add_category_frame.set_storage_path(self.storage_path)
             self.show_main()
         else:
             self.show_first_run()
 
+    # --------------------------------------------------------------------------------------------
+    # UI setup
+    # --------------------------------------------------------------------------------------------
     def _configure_styles(self) -> None:
         style = ttk.Style()
         try:
@@ -99,8 +99,8 @@ class EbayListingApp:
 
         style.configure(
             "Secondary.TButton",
-            padding=(16, 10),
-            font=("Segoe UI", 11),
+            padding=(12, 8),
+            font=("Segoe UI", 10),
             background="#E3F2FD",
             foreground=self.text_color,
             borderwidth=0,
@@ -123,37 +123,6 @@ class EbayListingApp:
             "TopNav.TMenubutton",
             background=[("active", "#E3F2FD"), ("pressed", "#D2E7FB")],
         )
-        style.layout(
-            "TopNav.TMenubutton",
-            [
-                (
-                    "Menubutton.border",
-                    {
-                        "sticky": "nswe",
-                        "children": [
-                            (
-                                "Menubutton.focus",
-                                {
-                                    "sticky": "nswe",
-                                    "children": [
-                                        (
-                                            "Menubutton.padding",
-                                            {
-                                                "sticky": "nswe",
-                                                "children": [
-                                                    ("Menubutton.label", {"sticky": "nswe"})
-                                                ],
-                                            },
-                                        )
-                                    ],
-                                },
-                            )
-                        ],
-                    },
-                )
-            ],
-        )
-        # Placeholder style slot for future top bar buttons if needed.
 
     def _create_top_bar(self) -> None:
         self.top_bar = tk.Frame(self.root, bg="#FFFFFF")
@@ -174,23 +143,23 @@ class EbayListingApp:
             activebackground=self.accent_color,
             activeforeground="white",
             borderwidth=0,
-            relief="flat",
-            activeborderwidth=0,
         )
         file_menu.add_command(label="Exit", command=self.root.quit)
         file_button.configure(menu=file_menu)
         file_button.pack(side="left", padx=4)
 
-        home_button = ttk.Button(
+        ttk.Button(
             nav_container,
             text="Home",
             style="TopNav.TMenubutton",
             command=self.show_main,
-        )
-        home_button.pack(side="left", padx=4)
+        ).pack(side="left", padx=4)
 
         categories_button = ttk.Menubutton(
-            nav_container, text="Categories", style="TopNav.TMenubutton", direction="below"
+            nav_container,
+            text="Categories",
+            style="TopNav.TMenubutton",
+            direction="below",
         )
         categories_menu = tk.Menu(
             categories_button,
@@ -200,32 +169,38 @@ class EbayListingApp:
             activebackground=self.accent_color,
             activeforeground="white",
             borderwidth=0,
-            relief="flat",
-            activeborderwidth=0,
         )
         categories_menu.add_command(label="Add/Edit/Delete Categories", command=self.show_add_category)
         categories_button.configure(menu=categories_menu)
         categories_button.pack(side="left", padx=4)
 
-        items_button = ttk.Menubutton(nav_container, text="Listings", style="TopNav.TMenubutton", direction="below")
-        items_menu = tk.Menu(
-            items_button,
+        listings_button = ttk.Menubutton(
+            nav_container,
+            text="Listings",
+            style="TopNav.TMenubutton",
+            direction="below",
+        )
+        listings_menu = tk.Menu(
+            listings_button,
             tearoff=0,
             background="#FFFFFF",
             foreground=self.text_color,
             activebackground=self.accent_color,
             activeforeground="white",
             borderwidth=0,
-            relief="flat",
-            activeborderwidth=0,
         )
-        items_menu.add_command(label="Add a New Item", command=self.show_add_item)
-        items_menu.add_command(label="Items Added", command=self.show_items_added)
-        items_menu.add_command(label="Items Ended", command=self.show_end_item)
-        items_button.configure(menu=items_menu)
-        items_button.pack(side="left", padx=4)
+        listings_menu.add_command(label="Add a New Item", command=self.show_add_item)
+        listings_menu.add_command(label="Items Added", command=self.show_items_added)
+        listings_menu.add_command(label="Items Ended", command=self.show_end_item)
+        listings_button.configure(menu=listings_menu)
+        listings_button.pack(side="left", padx=4)
 
-        settings_button = ttk.Menubutton(nav_container, text="Settings", style="TopNav.TMenubutton", direction="below")
+        settings_button = ttk.Menubutton(
+            nav_container,
+            text="Settings",
+            style="TopNav.TMenubutton",
+            direction="below",
+        )
         settings_menu = tk.Menu(
             settings_button,
             tearoff=0,
@@ -234,8 +209,6 @@ class EbayListingApp:
             activebackground=self.accent_color,
             activeforeground="white",
             borderwidth=0,
-            relief="flat",
-            activeborderwidth=0,
         )
         settings_menu.add_command(label="App Settings", command=self.show_settings)
         settings_menu.add_command(label="Storage Config", command=self.show_storage_config)
@@ -243,7 +216,7 @@ class EbayListingApp:
         settings_button.pack(side="left", padx=4)
 
         spacer = tk.Frame(row, bg="#FFFFFF")
-        spacer.pack(side="left", expand=True, fill="x")
+        spacer.pack(side="left", fill="x", expand=True)
 
         accent = tk.Frame(self.top_bar, bg="#0064D2", height=2)
         accent.pack(side="top", fill="x")
@@ -279,19 +252,20 @@ class EbayListingApp:
             show_main_callback=self.show_main,
             toggle_fullscreen_callback=self.toggle_fullscreen_mode,
         )
-        self.settings_view.update_toggle_label("Switch to Windowed" if self.is_fullscreen else "Switch to Fullscreen")
+
         self.add_category_frame = AddCategoryView(
             self.content_container,
             primary_bg=self.primary_bg,
             text_color=self.text_color,
             storage_path=self.storage_path,
             on_categories_changed=self._update_categories_display,
-            items_provider=lambda: self.items,
+            items_provider=self._get_items_list,
             edit_item_callback=self._edit_item,
             delete_item_callback=self._delete_item,
             open_item_callback=self._open_item_details,
             end_item_callback=self._end_item,
         )
+
         self.add_item_frame = AddItemView(
             self.content_container,
             primary_bg=self.primary_bg,
@@ -300,6 +274,7 @@ class EbayListingApp:
             categories_provider=self.add_category_frame.get_categories,
             on_items_changed=self._update_items_display,
         )
+
         self.items_added_frame = ItemsAddedView(
             self.content_container,
             primary_bg=self.primary_bg,
@@ -311,6 +286,7 @@ class EbayListingApp:
             open_callback=self._open_item_details,
             end_callback=self._end_item,
         )
+
         self.end_item_frame = EndItemsView(
             self.content_container,
             primary_bg=self.primary_bg,
@@ -322,85 +298,30 @@ class EbayListingApp:
             restore_callback=self._restore_item,
             delete_callback=self._delete_item,
         )
-        self.readd_item_frame = tk.Frame(self.content_container, bg=self.primary_bg)
-        self.remove_item_frame = tk.Frame(self.content_container, bg=self.primary_bg)
+
         self.storage_config_frame = tk.Frame(self.content_container, bg=self.primary_bg)
 
         self._build_main_hero_title()
 
         heading = tk.Label(
             self.main_frame,
-            text="eBay Listings Manager",
+            text="Manage your listings at a glance",
             font=("Segoe UI Semibold", 24),
             bg=self.primary_bg,
             fg=self.text_color,
         )
-        heading.pack(pady=(20, 10))
+        heading.pack(pady=(12, 16))
 
         self._build_global_search()
 
         self.dashboard_container = tk.Frame(self.main_frame, bg=self.primary_bg)
-        self.dashboard_container.pack(fill="both", expand=True, padx=40, pady=(30, 40))
+        self.dashboard_container.pack(fill="both", expand=True, padx=40, pady=(12, 40))
         self.dashboard_container.columnconfigure(0, weight=2)
         self.dashboard_container.columnconfigure(1, weight=1)
         self.dashboard_container.rowconfigure(0, weight=1)
 
         self._build_main_categories_section()
         self._build_recent_items_section()
-
-        storage_header = tk.Label(
-            self.storage_config_frame,
-            text="Storage Configuration",
-            font=("Segoe UI Semibold", 22),
-            bg=self.primary_bg,
-            fg=self.text_color,
-        )
-        storage_header.pack(pady=(40, 12))
-
-        storage_description = tk.Label(
-            self.storage_config_frame,
-            text=(
-                "Choose the default folder where listings, categories, and shared data will be stored.\n"
-                "Pick a location that you and collaborators can both access."
-            ),
-            font=("Segoe UI", 12),
-            bg=self.primary_bg,
-            fg="#305170",
-            justify="center",
-        )
-        storage_description.pack(pady=(0, 24))
-
-        storage_card = tk.Frame(self.storage_config_frame, bg=self.card_bg, padx=30, pady=30)
-        storage_card.pack(pady=10)
-
-        initial_storage_value = (
-            f"Current storage folder:\n{self.storage_path}"
-            if self.storage_path
-            else "No folder selected yet."
-        )
-        self.storage_value = tk.StringVar(value=initial_storage_value)
-
-        storage_value_label = tk.Label(
-            storage_card,
-            textvariable=self.storage_value,
-            font=("Segoe UI", 11),
-            bg=self.card_bg,
-            fg=self.text_color,
-            wraplength=420,
-            justify="left",
-        )
-        storage_value_label.pack(fill="x")
-
-        storage_button = ttk.Button(
-            storage_card,
-            text="Choose Storage Folder",
-            command=self._select_storage_path,
-            style="Primary.TButton",
-        )
-        storage_button.pack(pady=(18, 0), fill="x")
-
-        self._update_categories_display(self.add_category_frame.get_categories())
-        self._update_items_display(self.add_item_frame.get_items())
 
         default_base = self._default_storage_base_path()
         self.first_run_frame = FirstRunWizard(
@@ -413,6 +334,21 @@ class EbayListingApp:
             on_complete=self._on_first_run_complete,
         )
 
+    # --------------------------------------------------------------------------------------------
+    # Top bar helpers
+    # --------------------------------------------------------------------------------------------
+    def _show_top_bar(self) -> None:
+        if not getattr(self, "top_bar_visible", False):
+            self.top_bar.pack(side="top", fill="x")
+            self.content_container.pack_forget()
+            self.content_container.pack(fill="both", expand=True)
+            self.top_bar_visible = True
+
+    def _hide_top_bar(self) -> None:
+        if getattr(self, "top_bar_visible", False):
+            self.top_bar.pack_forget()
+            self.top_bar_visible = False
+
     def _show_frame(self, frame: tk.Widget) -> None:
         for widget in (
             self.main_scroll_canvas,
@@ -420,23 +356,23 @@ class EbayListingApp:
             self.add_category_frame,
             self.add_item_frame,
             self.items_added_frame,
-            self.readd_item_frame,
-            self.remove_item_frame,
             self.end_item_frame,
             self.storage_config_frame,
             self.first_run_frame,
         ):
             widget.pack_forget()
         frame.pack(fill="both", expand=True)
-
         if frame is self.main_scroll_canvas:
             self._sync_main_scroll_region(None)
-        else:
-            self._unbind_main_mousewheel(None)
 
+    # --------------------------------------------------------------------------------------------
+    # Navigation
+    # --------------------------------------------------------------------------------------------
     def show_main(self) -> None:
         self._show_top_bar()
         self._show_frame(self.main_scroll_canvas)
+        self._render_recent_items()
+        self._render_main_categories(self.add_category_frame.get_categories())
 
     def show_settings(self) -> None:
         self._show_top_bar()
@@ -449,28 +385,17 @@ class EbayListingApp:
     def show_add_item(self) -> None:
         self._show_top_bar()
         self._show_frame(self.add_item_frame)
-        if isinstance(self.add_item_frame, AddItemView):
-            self.add_item_frame.open_add_item_dialog()
+        self.add_item_frame.open_add_item_dialog()
 
     def show_items_added(self) -> None:
         self._show_top_bar()
-        if hasattr(self, "items_added_frame"):
-            self.items_added_frame.set_items(self.items)
-            self._show_frame(self.items_added_frame)
-
-    def show_readd_item(self) -> None:
-        self._show_top_bar()
-        self._show_frame(self.readd_item_frame)
-
-    def show_remove_item(self) -> None:
-        self._show_top_bar()
-        self._show_frame(self.remove_item_frame)
+        self.items_added_frame.set_items(self.items)
+        self._show_frame(self.items_added_frame)
 
     def show_end_item(self) -> None:
         self._show_top_bar()
-        if hasattr(self, "end_item_frame"):
-            self.end_item_frame.set_items(self.items)
-            self._show_frame(self.end_item_frame)
+        self.end_item_frame.set_items(self.items)
+        self._show_frame(self.end_item_frame)
 
     def show_storage_config(self) -> None:
         self._show_top_bar()
@@ -480,160 +405,43 @@ class EbayListingApp:
         self._hide_top_bar()
         self._show_frame(self.first_run_frame)
 
-    def _select_storage_path(self) -> None:
-        selected_dir = filedialog.askdirectory(
-            parent=self.root,
-            title="Select Storage Folder",
-            mustexist=True,
-        )
-        if selected_dir:
-            self._apply_storage_directory(selected_dir)
-
-    def toggle_fullscreen_mode(self) -> None:
-        if not self.is_fullscreen:
-            self.is_fullscreen = True
-        else:
-            self.is_fullscreen = False
-        self._apply_window_mode()
-        self._save_config()
-
-    def run(self) -> None:
-        self.root.mainloop()
-
-    def _apply_window_mode(self) -> None:
-        if self.is_fullscreen:
-            self.root.attributes("-fullscreen", True)
-            self.settings_view.update_toggle_label("Switch to Windowed")
-        else:
-            self.root.attributes("-fullscreen", False)
-            self.root.geometry(self.default_geometry)
-            self.settings_view.update_toggle_label("Switch to Fullscreen")
-
-    def _apply_storage_directory(self, base_path: str) -> bool:
-        normalized = os.path.abspath(base_path)
-        if os.path.basename(normalized.rstrip(os.sep)) == "ebaylistingsconfig":
-            config_dir = normalized
-        else:
-            config_dir = os.path.join(normalized, "ebaylistingsconfig")
-
-        try:
-            os.makedirs(config_dir, exist_ok=True)
-        except OSError as exc:
-            messagebox.showerror(
-                "Storage Configuration",
-                f"Unable to prepare the storage folder.\n\n{exc}",
-                parent=self.root,
-            )
-            return False
-
-        self.storage_path = config_dir
-        if hasattr(self, "add_category_frame"):
-            self.add_category_frame.set_storage_path(config_dir)
-        if hasattr(self, "add_item_frame"):
-            self.add_item_frame.set_storage_path(config_dir)
-        if hasattr(self, "storage_value"):
-            self.storage_value.set(f"Current storage folder:\n{config_dir}")
-        self._save_config()
-        return True
-
-    def _load_config(self) -> dict[str, object]:
-        if os.path.exists(self.config_path):
-            try:
-                with open(self.config_path, "r", encoding="utf-8") as config_file:
-                    data = json.load(config_file)
-                    if isinstance(data, dict):
-                        return data
-            except (OSError, json.JSONDecodeError):
-                messagebox.showwarning(
-                    "Settings",
-                    "The settings file could not be read. Defaults will be used.",
-                    parent=self.root,
-                )
-        return {}
-
-    def _save_config(self) -> None:
-        config_dir = os.path.dirname(self.config_path)
-        try:
-            os.makedirs(config_dir, exist_ok=True)
-        except OSError as exc:
-            messagebox.showwarning(
-                "Settings",
-                f"Unable to create settings folder.\n\n{exc}",
-                parent=self.root,
-            )
-            return
-
-        data = {
-            "fullscreen": self.is_fullscreen,
-            "storage_path": self.storage_path,
-        }
-        try:
-            with open(self.config_path, "w", encoding="utf-8") as config_file:
-                json.dump(data, config_file, indent=2)
-        except OSError as exc:
-            messagebox.showwarning(
-                "Settings",
-                f"Unable to save settings.\n\n{exc}",
-                parent=self.root,
-            )
-
-    def _default_storage_base_path(self) -> str:
-        documents = os.path.join(os.path.expanduser("~"), "Documents")
-        if os.path.isdir(documents):
-            return documents
-        return os.path.expanduser("~")
-
-    def _resolve_config_path(self) -> str:
-        documents = os.path.join(os.path.expanduser("~"), "Documents")
-        base_dir = documents if os.path.isdir(documents) else os.path.expanduser("~")
-        config_dir = os.path.join(base_dir, "ebaylistingapp")
-        return os.path.join(config_dir, "app_config.json")
-
-    def _on_first_run_complete(self) -> None:
-        if not self.storage_path:
-            return
-        self.show_main()
-
+    # --------------------------------------------------------------------------------------------
+    # Dashboard rendering
+    # --------------------------------------------------------------------------------------------
     def _build_main_hero_title(self) -> None:
-        if hasattr(self, "hero_title_frame") and self.hero_title_frame.winfo_exists():
-            self.hero_title_frame.destroy()
-
         self.hero_title_frame = tk.Frame(self.main_frame, bg=self.primary_bg)
-        self.hero_title_frame.pack(pady=(60, 10))
+        self.hero_title_frame.pack(pady=(32, 8))
 
         palette = ("#E53238", "#0064D2", "#F5AF02", "#86B817")
-        title_text = "eBay Listing Manager"
+        title_text = "eBay Listings Manager"
         palette_index = 0
 
         for char in title_text:
             if char == " ":
-                spacer = tk.Label(self.hero_title_frame, text=" ", font=("Segoe UI Semibold", 26), bg=self.primary_bg)
-                spacer.pack(side="left")
+                tk.Label(self.hero_title_frame, text=" ", font=("Segoe UI Semibold", 26), bg=self.primary_bg).pack(side="left")
                 continue
 
             color = palette[palette_index % len(palette)]
-            label = tk.Label(
+            tk.Label(
                 self.hero_title_frame,
                 text=char,
                 font=("Segoe UI Semibold", 26),
                 bg=self.primary_bg,
                 fg=color,
-            )
-            label.pack(side="left")
+            ).pack(side="left")
             palette_index += 1
 
     def _build_main_categories_section(self) -> None:
         self.main_categories_section = tk.Frame(self.dashboard_container, bg=self.primary_bg)
         self.main_categories_section.grid(row=0, column=0, sticky="nsew", padx=(0, 20))
 
-        header = tk.Label(
+        tk.Label(
             self.main_categories_section,
             text="Categories",
             font=("Segoe UI Semibold", 20),
             bg=self.primary_bg,
             fg=self.text_color,
-        )
-        header.pack(anchor="w")
+        ).pack(anchor="w")
 
         self.main_categories_container = tk.Frame(self.main_categories_section, bg=self.primary_bg)
         self.main_categories_container.pack(fill="both", expand=True, pady=(12, 0))
@@ -642,14 +450,13 @@ class EbayListingApp:
         self.main_recent_section = tk.Frame(self.dashboard_container, bg=self.primary_bg)
         self.main_recent_section.grid(row=0, column=1, sticky="nsew")
 
-        header = tk.Label(
+        tk.Label(
             self.main_recent_section,
             text="Items Overview",
             font=("Segoe UI Semibold", 20),
             bg=self.primary_bg,
             fg=self.text_color,
-        )
-        header.pack(anchor="w")
+        ).pack(anchor="w")
 
         notebook_container = tk.Frame(self.main_recent_section, bg=self.primary_bg)
         notebook_container.pack(fill="both", expand=True, pady=(12, 0))
@@ -677,14 +484,13 @@ class EbayListingApp:
             self.main_categories_container.grid_columnconfigure(col, weight=1, uniform="categories")
 
         if not categories:
-            placeholder = tk.Label(
+            tk.Label(
                 self.main_categories_container,
                 text="No categories to display yet.",
                 font=("Segoe UI", 12),
                 bg=self.primary_bg,
                 fg="#5A6D82",
-            )
-            placeholder.grid(row=0, column=0, sticky="w")
+            ).grid(row=0, column=0, sticky="w")
             return
 
         for index, category in enumerate(categories):
@@ -748,7 +554,7 @@ class EbayListingApp:
                 card,
                 text="Open",
                 style="Secondary.TButton",
-                command=lambda cat=category: self._open_category_from_main(cat),
+                command=lambda cat=dict(category): self._open_category_from_main(cat),
             ).pack(anchor="e")
 
         self._sync_main_scroll_region(None)
@@ -855,14 +661,15 @@ class EbayListingApp:
             details.append(f"Added: {item['date_added']}")
         if item.get("end_date"):
             details.append(f"End: {item['end_date']}")
-        if details:
-            tk.Label(
-                card,
-                text=" • ".join(details),
-                font=("Segoe UI", 10),
-                bg=self.card_bg,
-                fg="#41566F",
-            ).pack(anchor="w", pady=(4, 4))
+        status = (item.get("status") or "active").capitalize()
+        details.append(f"Status: {status}")
+        tk.Label(
+            card,
+            text=" • ".join(details),
+            font=("Segoe UI", 10),
+            bg=self.card_bg,
+            fg="#41566F",
+        ).pack(anchor="w", pady=(4, 4))
 
         notes = item.get("notes")
         if notes:
@@ -897,12 +704,9 @@ class EbayListingApp:
         self.items = items
         self._render_recent_items()
         self._render_main_categories(self.add_category_frame.get_categories())
-        if hasattr(self, "items_added_frame"):
-            self.items_added_frame.set_items(items)
-        if hasattr(self, "end_item_frame"):
-            self.end_item_frame.set_items(items)
-        if hasattr(self, "add_category_frame"):
-            self.add_category_frame.refresh_open_category_items()
+        self.items_added_frame.set_items(items)
+        self.end_item_frame.set_items(items)
+        self.add_category_frame.refresh_open_category_items()
         if hasattr(self, "global_search_var"):
             self._perform_global_search(self.global_search_var.get())
 
@@ -923,69 +727,31 @@ class EbayListingApp:
     def _open_item_details(self, item_id: str) -> None:
         self.add_item_frame.open_item_details(item_id)
 
-    def _sync_main_scroll_region(self, _: Any) -> None:
-        if hasattr(self, "main_scroll_canvas"):
-            self.main_scroll_canvas.configure(scrollregion=self.main_scroll_canvas.bbox("all"))
-
-    def _match_main_canvas_width(self, event: Any) -> None:
-        if hasattr(self, "main_scroll_canvas"):
-            self.main_scroll_canvas.itemconfigure(self.main_scroll_window, width=event.width)
-
-    def _bind_main_mousewheel(self, _: Any) -> None:
-        if self._main_mousewheel_bound:
-            return
-        self.main_scroll_canvas.bind_all("<MouseWheel>", self._on_main_mousewheel)
-        self.main_scroll_canvas.bind_all("<Button-4>", self._on_main_mousewheel)
-        self.main_scroll_canvas.bind_all("<Button-5>", self._on_main_mousewheel)
-        self._main_mousewheel_bound = True
-
-    def _unbind_main_mousewheel(self, _: Any) -> None:
-        if not self._main_mousewheel_bound:
-            return
-        self.main_scroll_canvas.unbind_all("<MouseWheel>")
-        self.main_scroll_canvas.unbind_all("<Button-4>")
-        self.main_scroll_canvas.unbind_all("<Button-5>")
-        self._main_mousewheel_bound = False
-
-    def _on_main_mousewheel(self, event: Any) -> None:
-        if event.num == 4 or (hasattr(event, "delta") and event.delta > 0):
-            self.main_scroll_canvas.yview_scroll(-1, "units")
-        elif event.num == 5 or (hasattr(event, "delta") and event.delta < 0):
-            self.main_scroll_canvas.yview_scroll(1, "units")
-
-    def _show_top_bar(self) -> None:
-        if not getattr(self, "top_bar_visible", False):
-            self.top_bar.pack(side="top", fill="x")
-            self.content_container.pack_forget()
-            self.content_container.pack(fill="both", expand=True)
-            self.top_bar_visible = True
-
-    def _hide_top_bar(self) -> None:
-        if getattr(self, "top_bar_visible", False):
-            self.top_bar.pack_forget()
-            self.top_bar_visible = False
-
+    # --------------------------------------------------------------------------------------------
+    # Global search helpers
+    # --------------------------------------------------------------------------------------------
     def _build_global_search(self) -> None:
         search_wrapper = tk.Frame(self.main_frame, bg=self.primary_bg)
-        search_wrapper.pack(fill="x", padx=40, pady=(0, 20))
+        search_wrapper.pack(fill="x", padx=40, pady=(0, 24))
 
-        tk.Label(
+        ttk.Label(
             search_wrapper,
             text="Search across categories and items",
+            background=self.primary_bg,
+            foreground=self.text_color,
             font=("Segoe UI", 11),
-            bg=self.primary_bg,
-            fg=self.text_color,
         ).pack(anchor="w")
 
-        entry_row = tk.Frame(search_wrapper, bg=self.primary_bg)
-        entry_row.pack(fill="x", pady=(6, 0))
+        row = tk.Frame(search_wrapper, bg=self.primary_bg)
+        row.pack(fill="x", pady=(8, 0))
 
         self.global_search_var = tk.StringVar()
-        search_entry = ttk.Entry(entry_row, textvariable=self.global_search_var, width=50)
-        search_entry.pack(side="left", fill="x", expand=True)
-        search_entry.bind("<Return>", lambda _: self._perform_global_search(self.global_search_var.get()))
+        entry = ttk.Entry(row, textvariable=self.global_search_var, width=50)
+        entry.pack(side="left", fill="x", expand=True)
+        entry.bind("<Return>", lambda _: self._perform_global_search(self.global_search_var.get()))
+
         ttk.Button(
-            entry_row,
+            row,
             text="Search",
             style="Secondary.TButton",
             command=lambda: self._perform_global_search(self.global_search_var.get()),
@@ -995,12 +761,12 @@ class EbayListingApp:
         self.global_search_results.pack(fill="x", pady=(12, 0))
 
         self.global_search_var.trace_add("write", self._handle_global_search_update)
-        self._perform_global_search("")
 
     def _handle_global_search_update(self, *_: Any) -> None:
-        # Only auto-refresh when query is empty or reasonably long
-        query = self.global_search_var.get()
-        if not query or len(query) >= 2:
+        query = self.global_search_var.get().strip()
+        if not query:
+            self._clear_global_search_results()
+        elif len(query) >= 2:
             self._perform_global_search(query)
 
     def _clear_global_search_results(self) -> None:
@@ -1008,33 +774,26 @@ class EbayListingApp:
             child.destroy()
 
     def _perform_global_search(self, query: str) -> None:
-        if not hasattr(self, "global_search_results"):
-            return
-
         query = (query or "").strip().lower()
         self._clear_global_search_results()
+        if not query:
+            return
 
+        categories = self.add_category_frame.get_categories()
+        items = self.add_item_frame.get_items()
         results: list[tuple[str, dict[str, Any]]] = []
 
-        categories = self.add_category_frame.get_categories() if hasattr(self, "add_category_frame") else []
-        items = self.add_item_frame.get_items() if hasattr(self, "add_item_frame") else []
+        for category in categories:
+            if query in category.get("name", "").lower() or query in category.get("description", "").lower():
+                results.append(("category", category))
 
-        if query:
-            for category in categories:
-                if query in category.get("name", "").lower() or query in category.get("description", "").lower():
-                    results.append(("category", category))
-
-            for item in items:
-                if (
-                    query in (item.get("name") or "").lower()
-                    or query in (item.get("description") or "").lower()
-                    or query in (item.get("notes") or "").lower()
-                ):
-                    results.append(("item", item))
-        else:
-            # default results show top few categories and items
-            results.extend(("category", category) for category in categories[:5])
-            results.extend(("item", item) for item in items[:5])
+        for item in items:
+            if (
+                query in (item.get("name") or "").lower()
+                or query in (item.get("description") or "").lower()
+                or query in (item.get("notes") or "").lower()
+            ):
+                results.append(("item", item))
 
         if not results:
             tk.Label(
@@ -1119,7 +878,137 @@ class EbayListingApp:
                     command=lambda item_id=payload.get("id"): self._open_item_details(item_id),
                 ).pack(anchor="e")
 
+    # --------------------------------------------------------------------------------------------
+    # Configuration helpers
+    # --------------------------------------------------------------------------------------------
+    def _select_storage_path(self) -> None:
+        selected_dir = filedialog.askdirectory(
+            parent=self.root,
+            title="Select Storage Folder",
+            mustexist=True,
+        )
+        if selected_dir:
+            self._apply_storage_directory(selected_dir)
+
+    def toggle_fullscreen_mode(self) -> None:
+        self.is_fullscreen = not self.is_fullscreen
+        self._apply_window_mode()
+        self._save_config()
+
+    def _apply_window_mode(self) -> None:
+        if self.is_fullscreen:
+            self.root.attributes("-fullscreen", True)
+            self.settings_view.update_toggle_label("Switch to Windowed")
+        else:
+            self.root.attributes("-fullscreen", False)
+            self.root.geometry(self.default_geometry)
+            self.settings_view.update_toggle_label("Switch to Fullscreen")
+
+    def _apply_storage_directory(self, base_path: str) -> bool:
+        normalized = os.path.abspath(base_path)
+        if os.path.basename(normalized.rstrip(os.sep)) == "ebaylistingsconfig":
+            config_dir = normalized
+        else:
+            config_dir = os.path.join(normalized, "ebaylistingsconfig")
+
+        try:
+            os.makedirs(config_dir, exist_ok=True)
+        except OSError as exc:
+            messagebox.showerror(
+                "Storage Configuration",
+                f"Unable to prepare the storage folder.\n\n{exc}",
+                parent=self.root,
+            )
+            return False
+
+        self.storage_path = config_dir
+        self.add_item_frame.set_storage_path(config_dir)
+        self.add_category_frame.set_storage_path(config_dir)
+        self._save_config()
+        self.show_main()
+        return True
+
+    def _default_storage_base_path(self) -> str:
+        documents = os.path.join(os.path.expanduser("~"), "Documents")
+        if os.path.isdir(documents):
+            return documents
+        return os.path.expanduser("~")
+
+    def _resolve_config_path(self) -> str:
+        documents = os.path.join(os.path.expanduser("~"), "Documents")
+        base_dir = documents if os.path.isdir(documents) else os.path.expanduser("~")
+        config_dir = os.path.join(base_dir, "ebaylistingapp")
+        os.makedirs(config_dir, exist_ok=True)
+        return os.path.join(config_dir, "app_config.json")
+
+    def _load_config(self) -> dict[str, Any]:
+        if os.path.exists(self.config_path):
+            try:
+                with open(self.config_path, "r", encoding="utf-8") as cfg:
+                    data = json.load(cfg)
+                    if isinstance(data, dict):
+                        return data
+            except (OSError, json.JSONDecodeError):
+                messagebox.showwarning(
+                    "Settings",
+                    "The settings file could not be read. Defaults will be used.",
+                    parent=self.root,
+                )
+        return {}
+
+    def _save_config(self) -> None:
+        data = {
+            "fullscreen": self.is_fullscreen,
+            "storage_path": self.storage_path,
+        }
+        try:
+            with open(self.config_path, "w", encoding="utf-8") as cfg:
+                json.dump(data, cfg, indent=2)
+        except OSError as exc:
+            messagebox.showwarning(
+                "Settings",
+                f"Unable to save settings.\n\n{exc}",
+                parent=self.root,
+            )
+
+    def _on_first_run_complete(self) -> None:
+        if not self.storage_path:
+            return
+        self.show_main()
+
+    # --------------------------------------------------------------------------------------------
+    # Canvas helpers
+    # --------------------------------------------------------------------------------------------
+    def _sync_main_scroll_region(self, _: Any) -> None:
+        self.main_scroll_canvas.configure(scrollregion=self.main_scroll_canvas.bbox("all"))
+
+    def _match_main_canvas_width(self, event: Any) -> None:
+        self.main_scroll_canvas.itemconfigure(self.main_scroll_window, width=event.width)
+
+    def _bind_main_mousewheel(self, _: Any) -> None:
+        self.main_scroll_canvas.bind_all("<MouseWheel>", self._on_main_mousewheel)
+        self.main_scroll_canvas.bind_all("<Button-4>", self._on_main_mousewheel)
+        self.main_scroll_canvas.bind_all("<Button-5>", self._on_main_mousewheel)
+
+    def _unbind_main_mousewheel(self, _: Any) -> None:
+        self.main_scroll_canvas.unbind_all("<MouseWheel>")
+        self.main_scroll_canvas.unbind_all("<Button-4>")
+        self.main_scroll_canvas.unbind_all("<Button-5>")
+
+    def _on_main_mousewheel(self, event: Any) -> None:
+        if event.num == 4 or (hasattr(event, "delta") and event.delta > 0):
+            self.main_scroll_canvas.yview_scroll(-1, "units")
+        elif event.num == 5 or (hasattr(event, "delta") and event.delta < 0):
+            self.main_scroll_canvas.yview_scroll(1, "units")
+
+    def _get_items_list(self) -> list[dict[str, Any]]:
+        return self.add_item_frame.get_items()
+
+
+def main() -> None:
+    app = EbayListingApp()
+    app.root.mainloop()
+
 
 if __name__ == "__main__":
-    app = EbayListingApp()
-    app.run()
+    main()
