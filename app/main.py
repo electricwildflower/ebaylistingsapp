@@ -754,14 +754,30 @@ class EbayListingApp:
             )
             card.pack(fill="x", pady=(0, 12))
 
+            name = item.get("name") or item.get("description", "Item")
             title = tk.Label(
                 card,
-                text=f"{item.get('description', 'Item')} • {item.get('category', 'No category')}",
+                text=name,
                 font=("Segoe UI Semibold", 13),
                 bg=self.card_bg,
                 fg=self.text_color,
             )
             title.pack(anchor="w")
+
+            subtitle_parts = []
+            if item.get("category"):
+                subtitle_parts.append(item["category"])
+            if item.get("date_added"):
+                subtitle_parts.append(f"Added {item['date_added']}")
+            subtitle = " • ".join(subtitle_parts)
+            if subtitle:
+                tk.Label(
+                    card,
+                    text=subtitle,
+                    font=("Segoe UI", 10),
+                    bg=self.card_bg,
+                    fg="#1E3A5F",
+                ).pack(anchor="w")
 
             notes = item.get("notes")
             if notes:

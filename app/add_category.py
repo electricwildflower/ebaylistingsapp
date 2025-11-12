@@ -437,14 +437,24 @@ class AddCategoryView(tk.Frame):
                 )
                 card.pack(fill="x", pady=(0, 12))
 
-                title = tk.Label(
+                name_label = tk.Label(
                     card,
-                    text=item.get("description", "Item"),
+                    text=item.get("name") or item.get("description", "Item"),
                     font=("Segoe UI Semibold", 13),
                     bg=self.card_bg,
                     fg=self.text_color,
                 )
-                title.pack(anchor="w")
+                name_label.pack(anchor="w")
+
+                title = tk.Label(
+                    card,
+                    text=item.get("description", ""),
+                    font=("Segoe UI", 11),
+                    bg=self.card_bg,
+                    fg=self.text_color,
+                )
+                if item.get("description"):
+                    title.pack(anchor="w", pady=(4, 2))
 
                 notes = item.get("notes")
                 if notes:

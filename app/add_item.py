@@ -159,6 +159,7 @@ class AddItemView(tk.Frame):
     def _build_form(self, parent: tk.Frame) -> None:
         categories = self._category_names()
         self._dialog_vars["category"] = tk.StringVar(value=categories[0] if categories else "")
+        self._dialog_vars["name"] = tk.StringVar()
         self._dialog_vars["date_added"] = tk.StringVar()
         self._dialog_vars["end_date"] = tk.StringVar()
         self._dialog_vars["image_url"] = tk.StringVar()
@@ -173,42 +174,45 @@ class AddItemView(tk.Frame):
         )
         self.category_combo.grid(row=1, column=0, sticky="we", pady=(4, 16))
 
-        ttk.Label(parent, text="Description", style="TLabel").grid(row=2, column=0, sticky="w")
+        ttk.Label(parent, text="Item Name", style="TLabel").grid(row=2, column=0, sticky="w")
+        ttk.Entry(parent, textvariable=self._dialog_vars["name"]).grid(row=3, column=0, sticky="we", pady=(4, 16))
+
+        ttk.Label(parent, text="Description", style="TLabel").grid(row=4, column=0, sticky="w")
         self._description_text = tk.Text(parent, width=44, height=4, font=("Segoe UI", 11))
-        self._description_text.grid(row=3, column=0, sticky="we", pady=(4, 16))
+        self._description_text.grid(row=5, column=0, sticky="we", pady=(4, 16))
 
-        ttk.Label(parent, text="Notes", style="TLabel").grid(row=4, column=0, sticky="w")
+        ttk.Label(parent, text="Notes", style="TLabel").grid(row=6, column=0, sticky="w")
         self._notes_text = tk.Text(parent, width=44, height=3, font=("Segoe UI", 11))
-        self._notes_text.grid(row=5, column=0, sticky="we", pady=(4, 16))
+        self._notes_text.grid(row=7, column=0, sticky="we", pady=(4, 16))
 
-        ttk.Label(parent, text="Date Added (YYYY-MM-DD)", style="TLabel").grid(row=6, column=0, sticky="w")
+        ttk.Label(parent, text="Date Added (YYYY-MM-DD)", style="TLabel").grid(row=8, column=0, sticky="w")
         date_added_row = tk.Frame(parent, bg=self.card_bg)
-        date_added_row.grid(row=7, column=0, sticky="we", pady=(4, 16))
+        date_added_row.grid(row=9, column=0, sticky="we", pady=(4, 16))
         date_added_row.columnconfigure(0, weight=1)
         ttk.Entry(date_added_row, textvariable=self._dialog_vars["date_added"]).grid(row=0, column=0, sticky="we")
         ttk.Button(date_added_row, text="Pick Date", command=lambda: self._open_date_picker("date_added")).grid(
             row=0, column=1, padx=(12, 0)
         )
 
-        ttk.Label(parent, text="End Date (YYYY-MM-DD)", style="TLabel").grid(row=8, column=0, sticky="w")
+        ttk.Label(parent, text="End Date (YYYY-MM-DD)", style="TLabel").grid(row=10, column=0, sticky="w")
         end_date_row = tk.Frame(parent, bg=self.card_bg)
-        end_date_row.grid(row=9, column=0, sticky="we", pady=(4, 16))
+        end_date_row.grid(row=11, column=0, sticky="we", pady=(4, 16))
         end_date_row.columnconfigure(0, weight=1)
         ttk.Entry(end_date_row, textvariable=self._dialog_vars["end_date"]).grid(row=0, column=0, sticky="we")
         ttk.Button(end_date_row, text="Pick Date", command=lambda: self._open_date_picker("end_date")).grid(
             row=0, column=1, padx=(12, 0)
         )
 
-        ttk.Label(parent, text="Image URL", style="TLabel").grid(row=10, column=0, sticky="w")
+        ttk.Label(parent, text="Image URL", style="TLabel").grid(row=12, column=0, sticky="w")
         url_row = tk.Frame(parent, bg=self.card_bg)
-        url_row.grid(row=11, column=0, sticky="we", pady=(4, 12))
+        url_row.grid(row=13, column=0, sticky="we", pady=(4, 12))
         url_row.columnconfigure(0, weight=1)
 
         ttk.Entry(url_row, textvariable=self._dialog_vars["image_url"]).grid(row=0, column=0, sticky="we", padx=(0, 12))
         ttk.Button(url_row, text="Preview", command=self._update_image_preview, width=10).grid(row=0, column=1)
 
         preview_container = tk.Frame(parent, bg=self.card_bg)
-        preview_container.grid(row=12, column=0, sticky="we", pady=(4, 16))
+        preview_container.grid(row=14, column=0, sticky="we", pady=(4, 16))
         preview_container.columnconfigure(0, weight=1)
 
         self._image_preview_label = tk.Label(
@@ -222,7 +226,7 @@ class AddItemView(tk.Frame):
         self._image_preview_label.pack(fill="both", expand=True)
 
         button_row = tk.Frame(parent, bg=self.card_bg)
-        button_row.grid(row=13, column=0, sticky="e", pady=(10, 0))
+        button_row.grid(row=15, column=0, sticky="e", pady=(10, 0))
 
         ttk.Button(button_row, text="Save", style="Primary.TButton", command=self._handle_save).pack(side="left")
         ttk.Button(button_row, text="Cancel", style="Secondary.TButton", command=self._close_dialog).pack(
@@ -239,6 +243,7 @@ class AddItemView(tk.Frame):
             return
 
         category = self._dialog_vars["category"].get().strip()
+        name = self._dialog_vars["name"].get().strip()
         description = (self._description_text.get("1.0", "end").strip() if self._description_text else "")
         notes = self._notes_text.get("1.0", "end").strip() if self._notes_text else ""
         date_added = self._dialog_vars["date_added"].get().strip()
@@ -249,6 +254,10 @@ class AddItemView(tk.Frame):
             messagebox.showerror("Add Item", "Please select a category.", parent=self.winfo_toplevel())
             return
 
+        if not name:
+            messagebox.showerror("Add Item", "Please provide a name for the item.", parent=self.winfo_toplevel())
+            return
+
         if not description:
             messagebox.showerror("Add Item", "Please provide a description for the item.", parent=self.winfo_toplevel())
             return
@@ -256,6 +265,7 @@ class AddItemView(tk.Frame):
         item = {
             "id": uuid4().hex,
             "category": category,
+            "name": name,
             "description": description,
             "notes": notes,
             "date_added": date_added,
@@ -352,10 +362,19 @@ class AddItemView(tk.Frame):
             )
             card.pack(fill="x", padx=40, pady=(0, 12))
 
+            name_label = tk.Label(
+                card,
+                text=item.get("name") or "Unnamed Item",
+                font=("Segoe UI Semibold", 14),
+                bg=self.card_bg,
+                fg=self.text_color,
+            )
+            name_label.pack(anchor="w")
+
             title = tk.Label(
                 card,
-                text=f"{item.get('category', '')} • {item.get('date_added') or 'No date'}",
-                font=("Segoe UI Semibold", 13),
+                text=f"{item.get('category', 'No category')} • {item.get('date_added') or 'No date'}",
+                font=("Segoe UI", 11),
                 bg=self.card_bg,
                 fg=self.text_color,
             )
@@ -448,7 +467,18 @@ class AddItemView(tk.Frame):
             for entry in raw_data:
                 if not isinstance(entry, dict):
                     continue
-                parsed.append(dict(entry))
+                normalized = dict(entry)
+                if "name" not in normalized:
+                    normalized["name"] = ""
+                else:
+                    normalized["name"] = str(normalized.get("name", "")).strip()
+                normalized["description"] = str(normalized.get("description", "")).strip()
+                normalized["notes"] = str(normalized.get("notes", "")).strip()
+                normalized["category"] = str(normalized.get("category", "")).strip()
+                normalized["date_added"] = str(normalized.get("date_added", "")).strip()
+                normalized["end_date"] = str(normalized.get("end_date", "")).strip()
+                normalized["image_url"] = str(normalized.get("image_url", "")).strip()
+                parsed.append(normalized)
         self.items = parsed
 
     def _data_file_path(self) -> str | None:
