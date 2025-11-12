@@ -55,6 +55,9 @@ class AddItemView(tk.Frame):
         self._is_mousewheel_bound = False
         self._date_picker_window: tk.Toplevel | None = None
         self._date_picker_state: dict[str, Any] = {}
+        self._dialog_canvas: tk.Canvas | None = None
+        self._dialog_mousewheel_bound = False
+        self._dialog_canvas_window_id: int | None = None
 
         self._load_items()
         self._build_layout()
@@ -130,8 +133,25 @@ class AddItemView(tk.Frame):
         )
         header.pack(pady=(0, 16))
 
-        self._dialog = tk.Frame(wrapper, bg=self.card_bg, padx=26, pady=26)
-        self._dialog.pack()
+        self._dialog_canvas = tk.Canvas(
+            wrapper,
+            bg=self.card_bg,
+            highlightthickness=0,
+            borderwidth=0,
+            height=420,
+        )
+        self._dialog_canvas.pack(fill="both", expand=True)
+
+        inner = tk.Frame(self._dialog_canvas, bg=self.card_bg)
+        self._dialog_canvas_window_id = self._dialog_canvas.create_window((0, 0), window=inner, anchor="nw")
+
+        inner.bind("<Configure>", self._sync_dialog_scroll_region)
+        self._dialog_canvas.bind("<Configure>", self._match_dialog_canvas_width)
+        self._dialog_canvas.bind("<Enter>", self._bind_dialog_mousewheel)
+        self._dialog_canvas.bind("<Leave>", self._unbind_dialog_mousewheel)
+
+        self._dialog = tk.Frame(inner, bg=self.card_bg, padx=26, pady=26)
+        self._dialog.pack(fill="both", expand=True)
 
         self._build_form(self._dialog)
 
@@ -284,6 +304,7 @@ class AddItemView(tk.Frame):
     def _close_dialog(self) -> None:
         if self._dialog and self._dialog.winfo_exists():
             self._dialog.destroy()
+        self._unbind_dialog_mousewheel(None)
         if self._dialog_backdrop and self._dialog_backdrop.winfo_exists():
             self._dialog_backdrop.place_forget()
             self._dialog_backdrop.destroy()
@@ -295,6 +316,9 @@ class AddItemView(tk.Frame):
         self._notes_text = None
         self._image_preview_label = None
         self._image_photo = None
+        self._dialog_canvas = None
+        self._dialog_canvas_window_id = None
+        self._dialog_mousewheel_bound = False
         self._close_date_picker()
 
     # --------------------------------------------------------------------------------------------
@@ -609,5 +633,40 @@ class AddItemView(tk.Frame):
             self._date_picker_window.destroy()
         self._date_picker_window = None
         self._date_picker_state = {}
+
+    # --------------------------------------------------------------------------------------------
+    # Dialog scrolling helpers
+    # --------------------------------------------------------------------------------------------
+    def _sync_dialog_scroll_region(self, _: Any) -> None:
+        if self._dialog_canvas:
+            self._dialog_canvas.configure(scrollregion=self._dialog_canvas.bbox("all"))
+
+    def _match_dialog_canvas_width(self, event: Any) -> None:
+        if self._dialog_canvas and self._dialog_canvas_window_id is not None:
+            self._dialog_canvas.itemconfigure(self._dialog_canvas_window_id, width=event.width)
+
+    def _bind_dialog_mousewheel(self, _: Any) -> None:
+        if self._dialog_mousewheel_bound or not self._dialog_canvas:
+            return
+        self._dialog_canvas.bind_all("<MouseWheel>", self._on_dialog_mousewheel)
+        self._dialog_canvas.bind_all("<Button-4>", self._on_dialog_mousewheel)
+        self._dialog_canvas.bind_all("<Button-5>", self._on_dialog_mousewheel)
+        self._dialog_mousewheel_bound = True
+
+    def _unbind_dialog_mousewheel(self, _: Any) -> None:
+        if not self._dialog_mousewheel_bound or not self._dialog_canvas:
+            return
+        self._dialog_canvas.unbind_all("<MouseWheel>")
+        self._dialog_canvas.unbind_all("<Button-4>")
+        self._dialog_canvas.unbind_all("<Button-5>")
+        self._dialog_mousewheel_bound = False
+
+    def _on_dialog_mousewheel(self, event: Any) -> None:
+        if not self._dialog_canvas:
+            return
+        if event.num == 4 or (hasattr(event, "delta") and event.delta > 0):
+            self._dialog_canvas.yview_scroll(-1, "units")
+        elif event.num == 5 or (hasattr(event, "delta") and event.delta < 0):
+            self._dialog_canvas.yview_scroll(1, "units")
 
 
