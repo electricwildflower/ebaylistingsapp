@@ -25,6 +25,11 @@ except ImportError:
     from add_item import AddItemView
 
 try:
+    from .end_items import EndItemsView
+except ImportError:
+    from end_items import EndItemsView
+
+try:
     from .items_added import ItemsAddedView
 except ImportError:
     from items_added import ItemsAddedView
@@ -283,6 +288,9 @@ class EbayListingApp:
             storage_path=self.storage_path,
             on_categories_changed=self._update_categories_display,
             items_provider=lambda: self.items,
+            edit_item_callback=self._edit_item,
+            delete_item_callback=self._delete_item,
+            open_item_callback=self._open_item_details,
         )
         self.add_item_frame = AddItemView(
             self.content_container,
@@ -301,10 +309,21 @@ class EbayListingApp:
             edit_callback=self._edit_item,
             delete_callback=self._delete_item,
             open_callback=self._open_item_details,
+            end_callback=self._end_item,
+        )
+        self.end_item_frame = EndItemsView(
+            self.content_container,
+            primary_bg=self.primary_bg,
+            text_color=self.text_color,
+            card_bg=self.card_bg,
+            items_provider=self.items,
+            open_callback=self._open_item_details,
+            edit_callback=self._edit_item,
+            restore_callback=self._restore_item,
+            delete_callback=self._delete_item,
         )
         self.readd_item_frame = tk.Frame(self.content_container, bg=self.primary_bg)
         self.remove_item_frame = tk.Frame(self.content_container, bg=self.primary_bg)
-        self.end_item_frame = tk.Frame(self.content_container, bg=self.primary_bg)
         self.storage_config_frame = tk.Frame(self.content_container, bg=self.primary_bg)
 
         self._build_main_hero_title()
@@ -467,6 +486,7 @@ class EbayListingApp:
     def show_items_added(self) -> None:
         self._show_top_bar()
         if hasattr(self, "items_added_frame"):
+            self.items_added_frame.set_items(self.items)
             self._show_frame(self.items_added_frame)
 
     def show_readd_item(self) -> None:
@@ -479,7 +499,9 @@ class EbayListingApp:
 
     def show_end_item(self) -> None:
         self._show_top_bar()
-        self._show_frame(self.end_item_frame)
+        if hasattr(self, "end_item_frame"):
+            self.end_item_frame.set_items(self.items)
+            self._show_frame(self.end_item_frame)
 
     def show_storage_config(self) -> None:
         self._show_top_bar()
@@ -824,6 +846,10 @@ class EbayListingApp:
         self._render_main_categories(self.add_category_frame.get_categories())
         if hasattr(self, "items_added_frame"):
             self.items_added_frame.set_items(items)
+        if hasattr(self, "end_item_frame"):
+            self.end_item_frame.set_items(items)
+        if hasattr(self, "add_category_frame"):
+            self.add_category_frame.refresh_open_category_items()
 
     def _edit_item(self, item_id: str) -> None:
         self._show_top_bar()
@@ -832,6 +858,12 @@ class EbayListingApp:
 
     def _delete_item(self, item_id: str) -> None:
         self.add_item_frame.delete_item(item_id)
+
+    def _end_item(self, item_id: str) -> None:
+        self.add_item_frame.end_item(item_id)
+
+    def _restore_item(self, item_id: str) -> None:
+        self.add_item_frame.restore_item(item_id)
 
     def _open_item_details(self, item_id: str) -> None:
         self.add_item_frame.open_item_details(item_id)

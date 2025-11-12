@@ -4,10 +4,18 @@ from __future__ import annotations
 
 import json
 import os
+import urllib.request
+from io import BytesIO
 from typing import Any, Callable
 
 import tkinter as tk
 from tkinter import messagebox, ttk
+
+try:
+    from PIL import Image, ImageTk  # type: ignore
+except ImportError:  # pragma: no cover - handled at runtime
+    Image = None  # type: ignore
+    ImageTk = None  # type: ignore
 
 
 class AddCategoryView(tk.Frame):
@@ -22,6 +30,9 @@ class AddCategoryView(tk.Frame):
         storage_path: str | None = None,
         on_categories_changed: Callable[[list[dict[str, str]]], None] | None = None,
         items_provider: Callable[[], list[dict[str, Any]]] | None = None,
+        edit_item_callback: Callable[[str], None] | None = None,
+        delete_item_callback: Callable[[str], None] | None = None,
+        open_item_callback: Callable[[str], None] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(master, bg=primary_bg, **kwargs)
@@ -39,6 +50,14 @@ class AddCategoryView(tk.Frame):
         self._dialog_description: tk.Text | None = None
         self._categories_changed_callback = on_categories_changed
         self._items_provider = items_provider
+        self._edit_item_callback = edit_item_callback
+        self._delete_item_callback = delete_item_callback
+        self._open_item_callback = open_item_callback
+
+        self._dialog_items_container: tk.Frame | None = None
+        self._dialog_images: list[tk.PhotoImage] = []
+        self._dialog_image_cache: dict[str, tk.PhotoImage] = {}
+        self._current_dialog_category: str | None = None
 
         self.search_value = tk.StringVar()
         self.search_value.trace_add("write", self._handle_search_change)
@@ -252,6 +271,9 @@ class AddCategoryView(tk.Frame):
         self._dialog_name_var = None
         self._dialog_days_var = None
         self._dialog_description = None
+        self._dialog_items_container = None
+        self._dialog_images.clear()
+        self._current_dialog_category = None
 
     def _save_category(self) -> None:
         if not (self._dialog_name_var and self._dialog_days_var and self._dialog_description):
@@ -382,17 +404,6 @@ class AddCategoryView(tk.Frame):
         if self._dialog_backdrop and self._dialog_backdrop.winfo_exists():
             self._close_dialog()
 
-        items: list[dict[str, Any]] = []
-        if self._items_provider:
-            try:
-                items = [
-                    item
-                    for item in self._items_provider()
-                    if item.get("category") == category.get("name")
-                ]
-            except Exception:
-                items = []
-
         self._dialog_mode = "view"
         self._dialog_backdrop = tk.Frame(self, bg=self.primary_bg)
         self._dialog_backdrop.place(relx=0, rely=0, relwidth=1, relheight=1)
@@ -414,73 +425,11 @@ class AddCategoryView(tk.Frame):
         self._dialog = tk.Frame(wrapper, bg=self.card_bg, padx=24, pady=24)
         self._dialog.pack()
 
-        container = tk.Frame(self._dialog, bg=self.card_bg)
-        container.pack(fill="both", expand=True)
-
-        if not items:
-            tk.Label(
-                container,
-                text="No items have been added to this category yet.",
-                font=("Segoe UI", 12),
-                bg=self.card_bg,
-                fg="#5A6D82",
-            ).pack()
-        else:
-            for item in items:
-                card = tk.Frame(
-                    container,
-                    bg=self.card_bg,
-                    highlightthickness=1,
-                    highlightbackground="#D7E3F5",
-                    padx=16,
-                    pady=12,
-                )
-                card.pack(fill="x", pady=(0, 12))
-
-                name_label = tk.Label(
-                    card,
-                    text=item.get("name") or item.get("description", "Item"),
-                    font=("Segoe UI Semibold", 13),
-                    bg=self.card_bg,
-                    fg=self.text_color,
-                )
-                name_label.pack(anchor="w")
-
-                title = tk.Label(
-                    card,
-                    text=item.get("description", ""),
-                    font=("Segoe UI", 11),
-                    bg=self.card_bg,
-                    fg=self.text_color,
-                )
-                if item.get("description"):
-                    title.pack(anchor="w", pady=(4, 2))
-
-                notes = item.get("notes")
-                if notes:
-                    tk.Label(
-                        card,
-                        text=f"Notes: {notes}",
-                        font=("Segoe UI", 10),
-                        bg=self.card_bg,
-                        fg="#41566F",
-                        wraplength=480,
-                        justify="left",
-                    ).pack(anchor="w", pady=(4, 4))
-
-                dates = []
-                if item.get("date_added"):
-                    dates.append(f"Added: {item['date_added']}")
-                if item.get("end_date"):
-                    dates.append(f"End: {item['end_date']}")
-                if dates:
-                    tk.Label(
-                        card,
-                        text=" • ".join(dates),
-                        font=("Segoe UI", 10),
-                        bg=self.card_bg,
-                        fg="#6F7F92",
-                    ).pack(anchor="w")
+        self._dialog_items_container = tk.Frame(self._dialog, bg=self.card_bg)
+        self._dialog_items_container.pack(fill="both", expand=True)
+        self._dialog_images.clear()
+        self._current_dialog_category = category.get("name")
+        self._render_dialog_items()
 
         button_row = tk.Frame(self._dialog, bg=self.card_bg)
         button_row.pack(anchor="e", pady=(8, 0))
@@ -581,4 +530,169 @@ class AddCategoryView(tk.Frame):
     def _notify_categories_changed(self) -> None:
         if self._categories_changed_callback:
             self._categories_changed_callback(self.get_categories())
+
+    def refresh_open_category_items(self) -> None:
+        if self._dialog_mode == "view" and self._dialog_items_container:
+            self._render_dialog_items()
+
+    def _render_dialog_items(self) -> None:
+        if not self._dialog_items_container:
+            return
+        for child in self._dialog_items_container.winfo_children():
+            child.destroy()
+        self._dialog_images.clear()
+
+        items = self._get_items_for_current_category()
+        if not items:
+            tk.Label(
+                self._dialog_items_container,
+                text="No items have been added to this category yet.",
+                font=("Segoe UI", 12),
+                bg=self.card_bg,
+                fg="#5A6D82",
+            ).pack()
+            return
+
+        for item in items:
+            card = tk.Frame(
+                self._dialog_items_container,
+                bg=self.card_bg,
+                highlightthickness=1,
+                highlightbackground="#D7E3F5",
+                padx=16,
+                pady=12,
+            )
+            card.pack(fill="x", pady=(0, 12))
+
+            content = tk.Frame(card, bg=self.card_bg)
+            content.pack(fill="x")
+
+            image_url = item.get("image_url") or ""
+            if image_url:
+                image_label = tk.Label(content, bg=self.card_bg)
+                image_label.pack(side="left", padx=(0, 16))
+                photo = self._load_image(image_url)
+                if photo:
+                    image_label.configure(image=photo)
+                    image_label.image = photo  # type: ignore[attr-defined]
+                    self._dialog_images.append(photo)
+                else:
+                    image_label.configure(text="No image", fg="#60738A", font=("Segoe UI", 9))
+
+            info = tk.Frame(content, bg=self.card_bg)
+            info.pack(side="left", expand=True, fill="x")
+
+            name = item.get("name") or item.get("description") or "Item"
+            tk.Label(
+                info,
+                text=name,
+                font=("Segoe UI Semibold", 15),
+                bg=self.card_bg,
+                fg=self.text_color,
+            ).pack(anchor="w")
+
+            subtitle_parts: list[str] = []
+            if item.get("date_added"):
+                subtitle_parts.append(f"Added: {item['date_added']}")
+            if item.get("end_date"):
+                subtitle_parts.append(f"End: {item['end_date']}")
+            if subtitle_parts:
+                tk.Label(
+                    info,
+                    text=" • ".join(subtitle_parts),
+                    font=("Segoe UI", 10),
+                    bg=self.card_bg,
+                    fg="#41566F",
+                ).pack(anchor="w", pady=(4, 6))
+
+            notes = item.get("notes")
+            if notes:
+                tk.Label(
+                    info,
+                    text=f"Notes: {notes}",
+                    font=("Segoe UI", 10),
+                    bg=self.card_bg,
+                    fg="#60738A",
+                    wraplength=520,
+                    justify="left",
+                ).pack(anchor="w")
+
+            actions = tk.Frame(card, bg=self.card_bg)
+            actions.pack(anchor="e", pady=(12, 0))
+
+            ttk.Button(
+                actions,
+                text="Open",
+                style="Secondary.TButton",
+                command=lambda item_id=item.get("id"): self._handle_item_open(item_id),
+            ).pack(side="left", padx=(0, 8))
+
+            ttk.Button(
+                actions,
+                text="Edit Item",
+                style="Secondary.TButton",
+                command=lambda item_id=item.get("id"): self._handle_item_edit(item_id),
+            ).pack(side="left", padx=(0, 8))
+
+            ttk.Button(
+                actions,
+                text="Delete",
+                style="Secondary.TButton",
+                command=lambda item_id=item.get("id"), name=item.get("name"): self._handle_item_delete(
+                    item_id, name
+                ),
+            ).pack(side="left")
+
+    def _get_items_for_current_category(self) -> list[dict[str, Any]]:
+        if not self._items_provider or not self._current_dialog_category:
+            return []
+        try:
+            return [
+                item
+                for item in self._items_provider()
+                if item.get("category") == self._current_dialog_category
+                and (item.get("status") or "active").lower() != "ended"
+            ]
+        except Exception:  # pragma: no cover - defensive
+            return []
+
+    def _handle_item_edit(self, item_id: str | None) -> None:
+        if item_id and self._edit_item_callback:
+            self._close_dialog()
+            self._edit_item_callback(item_id)
+
+    def _handle_item_delete(self, item_id: str | None, name: str | None) -> None:
+        if not item_id or not self._delete_item_callback:
+            return
+        confirmed = messagebox.askyesno(
+            "Delete Item",
+            f"Are you sure you want to delete \"{name or 'this item'}\"?",
+            parent=self.winfo_toplevel(),
+            icon="warning",
+        )
+        if confirmed:
+            self._delete_item_callback(item_id)
+            self._render_dialog_items()
+
+    def _handle_item_open(self, item_id: str | None) -> None:
+        if item_id and self._open_item_callback:
+            self._open_item_callback(item_id)
+
+    def _load_image(self, url: str) -> tk.PhotoImage | None:
+        if not url:
+            return None
+        if url in self._dialog_image_cache:
+            return self._dialog_image_cache[url]
+        if Image is None or ImageTk is None:
+            return None
+        try:
+            with urllib.request.urlopen(url) as response:
+                data = response.read()
+            image = Image.open(BytesIO(data))
+            image.thumbnail((120, 120))
+            photo = ImageTk.PhotoImage(image)
+            self._dialog_image_cache[url] = photo
+            return photo
+        except Exception:  # pragma: no cover - best effort fallback
+            return None
 

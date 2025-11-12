@@ -1,16 +1,15 @@
-"""UI view for browsing items that have been added."""
+"""UI view for items that have been ended."""
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any, Callable, Iterable
 
 import tkinter as tk
 from tkinter import messagebox, ttk
 
 
-class ItemsAddedView(tk.Frame):
-    """Displays saved items with search and ordering controls."""
+class EndItemsView(tk.Frame):
+    """Displays items that have been marked as ended."""
 
     def __init__(
         self,
@@ -20,10 +19,10 @@ class ItemsAddedView(tk.Frame):
         text_color: str,
         card_bg: str,
         items_provider: Iterable[dict[str, Any]] | None = None,
-        edit_callback: Callable[[str], None] | None = None,
-        delete_callback: Callable[[str], None] | None = None,
         open_callback: Callable[[str], None] | None = None,
-        end_callback: Callable[[str], None] | None = None,
+        edit_callback: Callable[[str], None] | None = None,
+        restore_callback: Callable[[str], None] | None = None,
+        delete_callback: Callable[[str], None] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(master, bg=primary_bg, **kwargs)
@@ -32,13 +31,12 @@ class ItemsAddedView(tk.Frame):
         self.card_bg = card_bg
         self._items: list[dict[str, Any]] = list(items_provider or [])
         self._filtered: list[dict[str, Any]] = []
-        self._edit_callback = edit_callback
-        self._delete_callback = delete_callback
         self._open_callback = open_callback
-        self._end_callback = end_callback
+        self._edit_callback = edit_callback
+        self._restore_callback = restore_callback
+        self._delete_callback = delete_callback
 
         self.search_value = tk.StringVar()
-        self.order_value = tk.StringVar(value="Newest added")
         self._is_mousewheel_bound = False
         self._image_cache: dict[str, tk.PhotoImage] = {}
         self._card_images: list[tk.PhotoImage] = []
@@ -77,16 +75,13 @@ class ItemsAddedView(tk.Frame):
         title_wrapper = tk.Frame(parent, bg=self.primary_bg)
         title_wrapper.pack(pady=(0, 24))
 
-        ebay_palette = ("#E53238", "#0064D2", "#F5AF02", "#86B817")
-        for index, char in enumerate("Items Added"):
-            color = ebay_palette[index % len(ebay_palette)]
-            tk.Label(
-                title_wrapper,
-                text=char,
-                font=("Segoe UI Semibold", 28),
-                bg=self.primary_bg,
-                fg=color,
-            ).pack(side="left")
+        tk.Label(
+            title_wrapper,
+            text="Ended Items",
+            font=("Segoe UI Semibold", 26),
+            bg=self.primary_bg,
+            fg=self.text_color,
+        ).pack()
 
     def _build_filters(self, parent: tk.Frame) -> None:
         filters = tk.Frame(parent, bg=self.primary_bg)
@@ -110,25 +105,6 @@ class ItemsAddedView(tk.Frame):
         search_entry.focus_set()
         self.search_value.trace_add("write", self._handle_filter_change)
 
-        order_label = tk.Label(
-            filters,
-            text="Order",
-            font=("Segoe UI", 11),
-            bg=self.primary_bg,
-            fg=self.text_color,
-        )
-        order_label.grid(row=0, column=1, sticky="w", padx=(24, 0))
-
-        order_combo = ttk.Combobox(
-            filters,
-            textvariable=self.order_value,
-            values=("Newest added", "Oldest added"),
-            state="readonly",
-            width=20,
-        )
-        order_combo.grid(row=1, column=1, sticky="w", padx=(24, 0), pady=(4, 0))
-        order_combo.bind("<<ComboboxSelected>>", lambda _event: self._handle_filter_change())
-
         filters.columnconfigure(0, weight=1)
 
     def _build_list_container(self, parent: tk.Frame) -> None:
@@ -148,7 +124,7 @@ class ItemsAddedView(tk.Frame):
     def _apply_filters(self) -> None:
         search_text = self.search_value.get().strip().lower()
         base_items = [
-            item for item in self._items if (item.get("status") or "active").lower() != "ended"
+            item for item in self._items if (item.get("status") or "active").lower() == "ended"
         ]
 
         if search_text:
@@ -163,18 +139,6 @@ class ItemsAddedView(tk.Frame):
         else:
             filtered = list(base_items)
 
-        reverse = self.order_value.get() != "Oldest added"
-
-        def sort_key(item: dict[str, Any]) -> tuple[int, str]:
-            raw = item.get("date_added") or ""
-            try:
-                parsed = datetime.fromisoformat(raw)
-                timestamp = int(parsed.timestamp())
-            except (TypeError, ValueError):
-                timestamp = 0
-            return (timestamp, raw)
-
-        filtered.sort(key=sort_key, reverse=reverse)
         self._filtered = filtered
         self._render_items()
 
@@ -184,19 +148,18 @@ class ItemsAddedView(tk.Frame):
     def _render_items(self) -> None:
         for child in self.list_container.winfo_children():
             child.destroy()
+        self._card_images.clear()
 
         if not self._filtered:
             tk.Label(
                 self.list_container,
-                text="No items match the current filters.",
+                text="No ended items yet.",
                 font=("Segoe UI", 12),
                 bg=self.primary_bg,
                 fg="#5A6D82",
             ).pack(pady=20)
             self._sync_scroll_region(None)
             return
-
-        self._card_images.clear()
 
         for item in self._filtered:
             card = tk.Frame(
@@ -242,7 +205,7 @@ class ItemsAddedView(tk.Frame):
             if item.get("date_added"):
                 subtitle_parts.append(f"Added: {item['date_added']}")
             if item.get("end_date"):
-                subtitle_parts.append(f"End: {item['end_date']}")
+                subtitle_parts.append(f"Ended: {item['end_date']}")
             if subtitle_parts:
                 tk.Label(
                     info,
@@ -283,9 +246,9 @@ class ItemsAddedView(tk.Frame):
 
             ttk.Button(
                 actions,
-                text="End Item",
+                text="Restore",
                 style="Secondary.TButton",
-                command=lambda item_id=item.get("id"), name=item.get("name"): self._handle_end(item_id, name),
+                command=lambda item_id=item.get("id"), name=item.get("name"): self._handle_restore(item_id, name),
             ).pack(side="left", padx=(0, 8))
 
             ttk.Button(
@@ -333,9 +296,25 @@ class ItemsAddedView(tk.Frame):
     # --------------------------------------------------------------------------------------------
     # Actions
     # --------------------------------------------------------------------------------------------
+    def _handle_open(self, item_id: str | None) -> None:
+        if item_id and self._open_callback:
+            self._open_callback(item_id)
+
     def _handle_edit(self, item_id: str | None) -> None:
         if item_id and self._edit_callback:
             self._edit_callback(item_id)
+
+    def _handle_restore(self, item_id: str | None, name: str | None) -> None:
+        if not item_id or not self._restore_callback:
+            return
+        answer = messagebox.askyesno(
+            "Restore Item",
+            f"Move \"{name or 'this item'}\" back to active listings?",
+            parent=self.winfo_toplevel(),
+            icon="question",
+        )
+        if answer:
+            self._restore_callback(item_id)
 
     def _handle_delete(self, item_id: str | None, name: str | None) -> None:
         if not item_id or not self._delete_callback:
@@ -349,22 +328,6 @@ class ItemsAddedView(tk.Frame):
         if answer:
             self._delete_callback(item_id)
 
-    def _handle_open(self, item_id: str | None) -> None:
-        if item_id and self._open_callback:
-            self._open_callback(item_id)
-
-    def _handle_end(self, item_id: str | None, name: str | None) -> None:
-        if not item_id or not self._end_callback:
-            return
-        answer = messagebox.askyesno(
-            "End Item",
-            f"Mark \"{name or 'this item'}\" as ended?",
-            parent=self.winfo_toplevel(),
-            icon="question",
-        )
-        if answer:
-            self._end_callback(item_id)
-
     def _load_image(self, url: str) -> tk.PhotoImage | None:
         if not url:
             return None
@@ -374,7 +337,7 @@ class ItemsAddedView(tk.Frame):
             from PIL import Image, ImageTk  # type: ignore
             import urllib.request
             from io import BytesIO
-        except Exception:
+        except Exception:  # pragma: no cover - Pillow optional
             return None
         try:
             with urllib.request.urlopen(url) as response:
@@ -384,6 +347,6 @@ class ItemsAddedView(tk.Frame):
             photo = ImageTk.PhotoImage(image)
             self._image_cache[url] = photo
             return photo
-        except Exception:
+        except Exception:  # pragma: no cover - best effort
             return None
 

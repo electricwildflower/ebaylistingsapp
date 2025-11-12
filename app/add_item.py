@@ -59,6 +59,7 @@ class AddItemView(tk.Frame):
         self._dialog_mousewheel_bound = False
         self._dialog_canvas_window_id: int | None = None
         self._editing_item_id: str | None = None
+        self._editing_item_status: str | None = None
 
         self._load_items()
         self._build_layout()
@@ -117,6 +118,7 @@ class AddItemView(tk.Frame):
 
         self._editing_item_id = item_id
         item_data = self._find_item(item_id) if item_id else None
+        self._editing_item_status = item_data.get("status") if item_data else "active"
 
         if self._dialog_backdrop and self._dialog_backdrop.winfo_exists():
             self._close_dialog()
@@ -248,6 +250,7 @@ class AddItemView(tk.Frame):
         self._dialog_vars["date_added"].set(item.get("date_added", ""))
         self._dialog_vars["end_date"].set(item.get("end_date", ""))
         self._dialog_vars["image_url"].set(item.get("image_url", ""))
+        self._editing_item_status = item.get("status", "active")
         if self._description_text is not None:
             self._description_text.delete("1.0", "end")
             self._description_text.insert("1.0", item.get("description", ""))
@@ -282,6 +285,7 @@ class AddItemView(tk.Frame):
             messagebox.showerror("Add Item", "Please provide a description for the item.", parent=self.winfo_toplevel())
             return
 
+        status = self._editing_item_status or "active"
         item = {
             "id": self._editing_item_id or uuid4().hex,
             "category": category,
@@ -291,6 +295,7 @@ class AddItemView(tk.Frame):
             "date_added": date_added,
             "end_date": end_date,
             "image_url": image_url,
+            "status": status,
         }
 
         if self._editing_item_id:
@@ -358,6 +363,7 @@ class AddItemView(tk.Frame):
         self._dialog_canvas_window_id = None
         self._dialog_mousewheel_bound = False
         self._editing_item_id = None
+        self._editing_item_status = None
         self._close_date_picker()
 
     # --------------------------------------------------------------------------------------------
@@ -367,7 +373,11 @@ class AddItemView(tk.Frame):
         for child in self.items_list_container.winfo_children():
             child.destroy()
 
-        if not self.items:
+        active_items = [
+            item for item in self.items if (item.get("status") or "active").lower() != "ended"
+        ]
+
+        if not active_items:
             placeholder = tk.Label(
                 self.items_list_container,
                 text="No items added yet. Click \"Add a New Item\" to get started.",
@@ -379,7 +389,7 @@ class AddItemView(tk.Frame):
             return
 
         # Show most recent first
-        for item in reversed(self.items):
+        for item in reversed(active_items):
             card = tk.Frame(
                 self.items_list_container,
                 bg=self.card_bg,
@@ -504,6 +514,7 @@ class AddItemView(tk.Frame):
                 normalized["date_added"] = str(normalized.get("date_added", "")).strip()
                 normalized["end_date"] = str(normalized.get("end_date", "")).strip()
                 normalized["image_url"] = str(normalized.get("image_url", "")).strip()
+                normalized["status"] = str(normalized.get("status", "active")).strip() or "active"
                 parsed.append(normalized)
         self.items = parsed
 
@@ -532,6 +543,28 @@ class AddItemView(tk.Frame):
         if index is None:
             return
         del self.items[index]
+        self._persist_items()
+        self._render_items_list()
+        self._notify_items_changed()
+
+    def end_item(self, item_id: str) -> None:
+        for item in self.items:
+            if item.get("id") == item_id:
+                item["status"] = "ended"
+                break
+        else:
+            return
+        self._persist_items()
+        self._render_items_list()
+        self._notify_items_changed()
+
+    def restore_item(self, item_id: str) -> None:
+        for item in self.items:
+            if item.get("id") == item_id:
+                item["status"] = "active"
+                break
+        else:
+            return
         self._persist_items()
         self._render_items_list()
         self._notify_items_changed()
