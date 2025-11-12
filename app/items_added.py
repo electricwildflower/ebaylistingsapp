@@ -20,7 +20,6 @@ class ItemsAddedView(tk.Frame):
         text_color: str,
         card_bg: str,
         items_provider: Iterable[dict[str, Any]] | None = None,
-        *,
         edit_callback: Callable[[str], None] | None = None,
         delete_callback: Callable[[str], None] | None = None,
         open_callback: Callable[[str], None] | None = None,
