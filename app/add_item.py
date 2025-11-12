@@ -122,7 +122,7 @@ class AddItemView(tk.Frame):
         self._dialog_backdrop.lift()
 
         wrapper = tk.Frame(self._dialog_backdrop, bg=self.primary_bg)
-        wrapper.pack(expand=True, pady=40)
+        wrapper.pack(expand=True, pady=40, padx=20)
 
         header = tk.Label(
             wrapper,
@@ -138,7 +138,8 @@ class AddItemView(tk.Frame):
             bg=self.card_bg,
             highlightthickness=0,
             borderwidth=0,
-            height=420,
+            height=520,
+            width=560,
         )
         self._dialog_canvas.pack(fill="both", expand=True)
 
