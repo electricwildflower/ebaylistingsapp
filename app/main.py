@@ -298,6 +298,9 @@ class EbayListingApp:
             text_color=self.text_color,
             card_bg=self.card_bg,
             items_provider=self.items,
+            edit_callback=self._edit_item,
+            delete_callback=self._delete_item,
+            open_callback=self._open_item_details,
         )
         self.readd_item_frame = tk.Frame(self.content_container, bg=self.primary_bg)
         self.remove_item_frame = tk.Frame(self.content_container, bg=self.primary_bg)
@@ -329,15 +332,6 @@ class EbayListingApp:
 
         self._build_main_categories_section()
         self._build_recent_items_section()
-
-        item_label = tk.Label(
-            self.add_item_frame,
-            text="Add Item (placeholder)",
-            font=("Segoe UI Semibold", 18),
-            bg=self.primary_bg,
-            fg=self.text_color,
-        )
-        item_label.pack(pady=40)
 
         readd_label = tk.Label(
             self.readd_item_frame,
@@ -830,6 +824,17 @@ class EbayListingApp:
         self._render_main_categories(self.add_category_frame.get_categories())
         if hasattr(self, "items_added_frame"):
             self.items_added_frame.set_items(items)
+
+    def _edit_item(self, item_id: str) -> None:
+        self._show_top_bar()
+        self._show_frame(self.add_item_frame)
+        self.add_item_frame.edit_item(item_id)
+
+    def _delete_item(self, item_id: str) -> None:
+        self.add_item_frame.delete_item(item_id)
+
+    def _open_item_details(self, item_id: str) -> None:
+        self.add_item_frame.open_item_details(item_id)
 
     def _sync_main_scroll_region(self, _: Any) -> None:
         if hasattr(self, "main_scroll_canvas"):

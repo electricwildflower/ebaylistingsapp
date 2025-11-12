@@ -58,6 +58,7 @@ class AddItemView(tk.Frame):
         self._dialog_canvas: tk.Canvas | None = None
         self._dialog_mousewheel_bound = False
         self._dialog_canvas_window_id: int | None = None
+        self._editing_item_id: str | None = None
 
         self._load_items()
         self._build_layout()
@@ -105,7 +106,7 @@ class AddItemView(tk.Frame):
         self.items_list_container = tk.Frame(self._canvas_frame, bg=self.primary_bg)
         self.items_list_container.pack(fill="both", expand=True, pady=(30, 0))
 
-    def open_add_item_dialog(self) -> None:
+    def open_add_item_dialog(self, item_id: str | None = None) -> None:
         if not self.storage_path:
             messagebox.showerror(
                 "Add Item",
@@ -113,6 +114,9 @@ class AddItemView(tk.Frame):
                 parent=self.winfo_toplevel(),
             )
             return
+
+        self._editing_item_id = item_id
+        item_data = self._find_item(item_id) if item_id else None
 
         if self._dialog_backdrop and self._dialog_backdrop.winfo_exists():
             self._close_dialog()
@@ -126,7 +130,7 @@ class AddItemView(tk.Frame):
 
         header = tk.Label(
             wrapper,
-            text="Add a New Item",
+            text="Edit Item" if item_data else "Add a New Item",
             font=("Segoe UI Semibold", 20),
             bg=self.primary_bg,
             fg=self.text_color,
@@ -154,9 +158,9 @@ class AddItemView(tk.Frame):
         self._dialog = tk.Frame(inner, bg=self.card_bg, padx=26, pady=26)
         self._dialog.pack(fill="both", expand=True)
 
-        self._build_form(self._dialog)
+        self._build_form(self._dialog, item_data=item_data)
 
-    def _build_form(self, parent: tk.Frame) -> None:
+    def _build_form(self, parent: tk.Frame, item_data: dict[str, Any] | None = None) -> None:
         categories = self._category_names()
         self._dialog_vars["category"] = tk.StringVar(value=categories[0] if categories else "")
         self._dialog_vars["name"] = tk.StringVar()
@@ -235,6 +239,22 @@ class AddItemView(tk.Frame):
 
         parent.columnconfigure(0, weight=1)
 
+        if item_data:
+            self._populate_form(item_data)
+
+    def _populate_form(self, item: dict[str, Any]) -> None:
+        self._dialog_vars["category"].set(item.get("category", ""))
+        self._dialog_vars["name"].set(item.get("name", ""))
+        self._dialog_vars["date_added"].set(item.get("date_added", ""))
+        self._dialog_vars["end_date"].set(item.get("end_date", ""))
+        self._dialog_vars["image_url"].set(item.get("image_url", ""))
+        if self._description_text is not None:
+            self._description_text.delete("1.0", "end")
+            self._description_text.insert("1.0", item.get("description", ""))
+        if self._notes_text is not None:
+            self._notes_text.delete("1.0", "end")
+            self._notes_text.insert("1.0", item.get("notes", ""))
+
     # --------------------------------------------------------------------------------------------
     # Event handlers
     # --------------------------------------------------------------------------------------------
@@ -263,7 +283,7 @@ class AddItemView(tk.Frame):
             return
 
         item = {
-            "id": uuid4().hex,
+            "id": self._editing_item_id or uuid4().hex,
             "category": category,
             "name": name,
             "description": description,
@@ -273,7 +293,14 @@ class AddItemView(tk.Frame):
             "image_url": image_url,
         }
 
-        self.items.append(item)
+        if self._editing_item_id:
+            for index, existing in enumerate(self.items):
+                if existing.get("id") == self._editing_item_id:
+                    self.items[index] = item
+                    break
+        else:
+            self.items.append(item)
+
         self._persist_items()
         self._render_items_list()
         self._notify_items_changed()
@@ -330,6 +357,7 @@ class AddItemView(tk.Frame):
         self._dialog_canvas = None
         self._dialog_canvas_window_id = None
         self._dialog_mousewheel_bound = False
+        self._editing_item_id = None
         self._close_date_picker()
 
     # --------------------------------------------------------------------------------------------
@@ -468,10 +496,8 @@ class AddItemView(tk.Frame):
                 if not isinstance(entry, dict):
                     continue
                 normalized = dict(entry)
-                if "name" not in normalized:
-                    normalized["name"] = ""
-                else:
-                    normalized["name"] = str(normalized.get("name", "")).strip()
+                normalized["id"] = str(normalized.get("id") or uuid4().hex)
+                normalized["name"] = str(normalized.get("name", "")).strip()
                 normalized["description"] = str(normalized.get("description", "")).strip()
                 normalized["notes"] = str(normalized.get("notes", "")).strip()
                 normalized["category"] = str(normalized.get("category", "")).strip()
@@ -494,6 +520,111 @@ class AddItemView(tk.Frame):
     def _notify_items_changed(self) -> None:
         if self._items_changed_callback:
             self._items_changed_callback(self.get_items())
+
+    # --------------------------------------------------------------------------------------------
+    # External operations
+    # --------------------------------------------------------------------------------------------
+    def edit_item(self, item_id: str) -> None:
+        self.open_add_item_dialog(item_id=item_id)
+
+    def delete_item(self, item_id: str) -> None:
+        index = next((i for i, item in enumerate(self.items) if item.get("id") == item_id), None)
+        if index is None:
+            return
+        del self.items[index]
+        self._persist_items()
+        self._render_items_list()
+        self._notify_items_changed()
+
+    def open_item_details(self, item_id: str) -> None:
+        item = self._find_item(item_id)
+        if not item:
+            return
+
+        detail = tk.Toplevel(self)
+        detail.title(item.get("name") or "Item details")
+        detail.configure(bg=self.primary_bg)
+        detail.transient(self.winfo_toplevel())
+        detail.grab_set()
+        detail.resizable(False, False)
+
+        frame = tk.Frame(detail, bg=self.primary_bg, padx=24, pady=24)
+        frame.pack(fill="both", expand=True)
+
+        tk.Label(
+            frame,
+            text=item.get("name") or "Item",
+            font=("Segoe UI Semibold", 18),
+            bg=self.primary_bg,
+            fg=self.text_color,
+        ).pack(anchor="w")
+
+        subtitle_parts = []
+        if item.get("category"):
+            subtitle_parts.append(f"Category: {item['category']}")
+        if item.get("date_added"):
+            subtitle_parts.append(f"Added: {item['date_added']}")
+        if item.get("end_date"):
+            subtitle_parts.append(f"Ends: {item['end_date']}")
+        if subtitle_parts:
+            tk.Label(
+                frame,
+                text=" • ".join(subtitle_parts),
+                font=("Segoe UI", 11),
+                bg=self.primary_bg,
+                fg="#41566F",
+            ).pack(anchor="w", pady=(6, 12))
+
+        if item.get("image_url"):
+            image_frame = tk.Frame(frame, bg=self.primary_bg)
+            image_frame.pack(anchor="w", pady=(0, 12))
+            image_label = tk.Label(image_frame, bg=self.primary_bg)
+            image_label.pack()
+            self._load_image_into_label(item.get("image_url"), image_label, max_size=(400, 300))
+
+        if item.get("description"):
+            tk.Label(
+                frame,
+                text=item["description"],
+                font=("Segoe UI", 11),
+                bg=self.primary_bg,
+                fg="#28374A",
+                wraplength=520,
+                justify="left",
+            ).pack(anchor="w", pady=(0, 10))
+
+        if item.get("notes"):
+            tk.Label(
+                frame,
+                text=f"Notes: {item['notes']}",
+                font=("Segoe UI", 10),
+                bg=self.primary_bg,
+                fg="#5A6D82",
+                wraplength=520,
+                justify="left",
+            ).pack(anchor="w")
+
+        ttk.Button(frame, text="Close", command=detail.destroy).pack(anchor="e", pady=(18, 0))
+
+    def _find_item(self, item_id: str | None) -> dict[str, Any] | None:
+        if not item_id:
+            return None
+        return next((dict(item) for item in self.items if item.get("id") == item_id), None)
+
+    def _load_image_into_label(self, url: str, label: tk.Label, max_size: tuple[int, int]) -> None:
+        if Image is None or ImageTk is None:
+            label.configure(text="Image preview requires Pillow.")
+            return
+        try:
+            with urllib.request.urlopen(url) as response:
+                data = response.read()
+            image = Image.open(BytesIO(data))
+            image.thumbnail(max_size)
+            photo = ImageTk.PhotoImage(image)
+            label.configure(image=photo, text="")
+            label.image = photo  # type: ignore[attr-defined]
+        except Exception as exc:  # pragma: no cover
+            label.configure(text=f"Unable to load image.\n{exc}")
 
     # --------------------------------------------------------------------------------------------
     # Scrolling helpers

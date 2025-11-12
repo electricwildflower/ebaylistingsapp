@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 import tkinter as tk
-from tkinter import ttk
+from tkinter import messagebox, ttk
 
 
 class ItemsAddedView(tk.Frame):
@@ -20,6 +20,10 @@ class ItemsAddedView(tk.Frame):
         text_color: str,
         card_bg: str,
         items_provider: Iterable[dict[str, Any]] | None = None,
+        *,
+        edit_callback: Callable[[str], None] | None = None,
+        delete_callback: Callable[[str], None] | None = None,
+        open_callback: Callable[[str], None] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(master, bg=primary_bg, **kwargs)
@@ -28,10 +32,15 @@ class ItemsAddedView(tk.Frame):
         self.card_bg = card_bg
         self._items: list[dict[str, Any]] = list(items_provider or [])
         self._filtered: list[dict[str, Any]] = []
+        self._edit_callback = edit_callback
+        self._delete_callback = delete_callback
+        self._open_callback = open_callback
 
         self.search_value = tk.StringVar()
         self.order_value = tk.StringVar(value="Newest added")
         self._is_mousewheel_bound = False
+        self._image_cache: dict[str, tk.PhotoImage] = {}
+        self._card_images: list[tk.PhotoImage] = []
 
         self._build_layout()
         self.set_items(self._items)
@@ -182,6 +191,8 @@ class ItemsAddedView(tk.Frame):
             self._sync_scroll_region(None)
             return
 
+        self._card_images.clear()
+
         for item in self._filtered:
             card = tk.Frame(
                 self.list_container,
@@ -193,9 +204,27 @@ class ItemsAddedView(tk.Frame):
             )
             card.pack(fill="x", pady=(0, 12))
 
+            content = tk.Frame(card, bg=self.card_bg)
+            content.pack(fill="x")
+
+            image_url = item.get("image_url") or ""
+            if image_url:
+                image_label = tk.Label(content, bg=self.card_bg)
+                image_label.pack(side="left", padx=(0, 16))
+                photo = self._load_image(image_url)
+                if photo:
+                    image_label.configure(image=photo)
+                    image_label.image = photo  # type: ignore[attr-defined]
+                    self._card_images.append(photo)
+                else:
+                    image_label.configure(text="No image", fg="#60738A", font=("Segoe UI", 9))
+
+            info = tk.Frame(content, bg=self.card_bg)
+            info.pack(side="left", expand=True, fill="x")
+
             name = item.get("name") or item.get("description") or "Item"
             tk.Label(
-                card,
+                info,
                 text=name,
                 font=("Segoe UI Semibold", 15),
                 bg=self.card_bg,
@@ -211,29 +240,17 @@ class ItemsAddedView(tk.Frame):
                 subtitle_parts.append(f"End: {item['end_date']}")
             if subtitle_parts:
                 tk.Label(
-                    card,
+                    info,
                     text=" • ".join(subtitle_parts),
                     font=("Segoe UI", 10),
                     bg=self.card_bg,
                     fg="#41566F",
                 ).pack(anchor="w", pady=(4, 6))
 
-            description = item.get("description")
-            if description:
-                tk.Label(
-                    card,
-                    text=description,
-                    font=("Segoe UI", 11),
-                    bg=self.card_bg,
-                    fg="#28374A",
-                    wraplength=520,
-                    justify="left",
-                ).pack(anchor="w", pady=(0, 6))
-
             notes = item.get("notes")
             if notes:
                 tk.Label(
-                    card,
+                    info,
                     text=f"Notes: {notes}",
                     font=("Segoe UI", 10),
                     bg=self.card_bg,
@@ -241,6 +258,30 @@ class ItemsAddedView(tk.Frame):
                     wraplength=520,
                     justify="left",
                 ).pack(anchor="w")
+
+            actions = tk.Frame(card, bg=self.card_bg)
+            actions.pack(anchor="e", pady=(12, 0))
+
+            ttk.Button(
+                actions,
+                text="Open",
+                style="Secondary.TButton",
+                command=lambda item_id=item.get("id"): self._handle_open(item_id),
+            ).pack(side="left", padx=(0, 8))
+
+            ttk.Button(
+                actions,
+                text="Edit Item",
+                style="Secondary.TButton",
+                command=lambda item_id=item.get("id"): self._handle_edit(item_id),
+            ).pack(side="left", padx=(0, 8))
+
+            ttk.Button(
+                actions,
+                text="Delete",
+                style="Secondary.TButton",
+                command=lambda item_id=item.get("id"), name=item.get("name"): self._handle_delete(item_id, name),
+            ).pack(side="left")
 
         self._sync_scroll_region(None)
 
@@ -276,4 +317,49 @@ class ItemsAddedView(tk.Frame):
             self.canvas.yview_scroll(-1, "units")
         elif event.num == 5 or (hasattr(event, "delta") and event.delta < 0):
             self.canvas.yview_scroll(1, "units")
+
+    # --------------------------------------------------------------------------------------------
+    # Actions
+    # --------------------------------------------------------------------------------------------
+    def _handle_edit(self, item_id: str | None) -> None:
+        if item_id and self._edit_callback:
+            self._edit_callback(item_id)
+
+    def _handle_delete(self, item_id: str | None, name: str | None) -> None:
+        if not item_id or not self._delete_callback:
+            return
+        answer = messagebox.askyesno(
+            "Delete Item",
+            f"Are you sure you want to delete \"{name or 'this item'}\"?",
+            parent=self.winfo_toplevel(),
+            icon="warning",
+        )
+        if answer:
+            self._delete_callback(item_id)
+
+    def _handle_open(self, item_id: str | None) -> None:
+        if item_id and self._open_callback:
+            self._open_callback(item_id)
+
+    def _load_image(self, url: str) -> tk.PhotoImage | None:
+        if not url:
+            return None
+        if url in self._image_cache:
+            return self._image_cache[url]
+        try:
+            from PIL import Image, ImageTk  # type: ignore
+            import urllib.request
+            from io import BytesIO
+        except Exception:
+            return None
+        try:
+            with urllib.request.urlopen(url) as response:
+                data = response.read()
+            image = Image.open(BytesIO(data))
+            image.thumbnail((120, 120))
+            photo = ImageTk.PhotoImage(image)
+            self._image_cache[url] = photo
+            return photo
+        except Exception:
+            return None
 
