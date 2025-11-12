@@ -372,6 +372,8 @@ class EbayListingApp:
     def show_main(self) -> None:
         self._show_top_bar()
         self._show_frame(self.main_scroll_canvas)
+        if hasattr(self, "global_search_var"):
+            self._clear_search()
         self._render_recent_items()
         self._render_main_categories(self.add_category_frame.get_categories())
 
@@ -768,7 +770,6 @@ class EbayListingApp:
         self._set_clear_search_enabled(False)
 
         self.global_search_results = tk.Frame(self.global_search_wrapper, bg=self.primary_bg)
-        self.global_search_results.pack(fill="x", expand=False, pady=(12, 0))
 
         self.global_search_var.trace_add("write", self._handle_global_search_update)
 
@@ -1033,13 +1034,11 @@ class EbayListingApp:
             if self.dashboard_container.winfo_ismapped():
                 self.dashboard_container.pack_forget()
             if hasattr(self, "global_search_results"):
-                self.global_search_results.pack_forget()
                 self.global_search_results.pack(fill="both", expand=True, pady=(12, 0))
             self._search_mode = True
         elif not active and current:
-            if hasattr(self, "global_search_results"):
+            if hasattr(self, "global_search_results") and self.global_search_results.winfo_ismapped():
                 self.global_search_results.pack_forget()
-                self.global_search_results.pack(fill="x", expand=False, pady=(12, 0))
             if not self.dashboard_container.winfo_ismapped():
                 self.dashboard_container.pack(fill="both", expand=True, padx=40, pady=(12, 40))
             self._search_mode = False
@@ -1053,6 +1052,8 @@ class EbayListingApp:
             self.global_search_clear_btn.state(["disabled"])
 
     def _clear_search(self) -> None:
+        if not hasattr(self, "global_search_var"):
+            return
         self.global_search_var.set("")
         self._clear_global_search_results()
         self._set_search_mode(False)
