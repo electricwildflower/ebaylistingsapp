@@ -220,8 +220,6 @@ class EbayListingApp:
         )
         items_menu.add_command(label="Add a New Item", command=self.show_add_item)
         items_menu.add_command(label="Items Added", command=self.show_items_added)
-        items_menu.add_command(label="Re-add an Item", command=self.show_readd_item)
-        items_menu.add_command(label="Remove an Item", command=self.show_remove_item)
         items_menu.add_command(label="End an Item", command=self.show_end_item)
         items_button.configure(menu=items_menu)
         items_button.pack(side="left", padx=4)
@@ -350,35 +348,14 @@ class EbayListingApp:
         )
         card_label.pack()
 
+        self.dashboard_container = tk.Frame(self.main_frame, bg=self.primary_bg)
+        self.dashboard_container.pack(fill="both", expand=True, padx=40, pady=(30, 40))
+        self.dashboard_container.columnconfigure(0, weight=2)
+        self.dashboard_container.columnconfigure(1, weight=1)
+        self.dashboard_container.rowconfigure(0, weight=1)
+
         self._build_main_categories_section()
         self._build_recent_items_section()
-
-        readd_label = tk.Label(
-            self.readd_item_frame,
-            text="Re-add Item (placeholder)",
-            font=("Segoe UI Semibold", 18),
-            bg=self.primary_bg,
-            fg=self.text_color,
-        )
-        readd_label.pack(pady=40)
-
-        remove_label = tk.Label(
-            self.remove_item_frame,
-            text="Remove Item (placeholder)",
-            font=("Segoe UI Semibold", 18),
-            bg=self.primary_bg,
-            fg=self.text_color,
-        )
-        remove_label.pack(pady=40)
-
-        end_label = tk.Label(
-            self.end_item_frame,
-            text="End Item (placeholder)",
-            font=("Segoe UI Semibold", 18),
-            bg=self.primary_bg,
-            fg=self.text_color,
-        )
-        end_label.pack(pady=40)
 
         storage_header = tk.Label(
             self.storage_config_frame,
@@ -655,8 +632,8 @@ class EbayListingApp:
             palette_index += 1
 
     def _build_main_categories_section(self) -> None:
-        self.main_categories_section = tk.Frame(self.main_frame, bg=self.primary_bg)
-        self.main_categories_section.pack(fill="x", padx=40, pady=(30, 0))
+        self.main_categories_section = tk.Frame(self.dashboard_container, bg=self.primary_bg)
+        self.main_categories_section.grid(row=0, column=0, sticky="nsew", padx=(0, 20))
 
         header = tk.Label(
             self.main_categories_section,
@@ -668,11 +645,11 @@ class EbayListingApp:
         header.pack(anchor="w")
 
         self.main_categories_container = tk.Frame(self.main_categories_section, bg=self.primary_bg)
-        self.main_categories_container.pack(fill="x", pady=(12, 0))
+        self.main_categories_container.pack(fill="both", expand=True, pady=(12, 0))
 
     def _build_recent_items_section(self) -> None:
-        self.main_recent_section = tk.Frame(self.main_frame, bg=self.primary_bg)
-        self.main_recent_section.pack(fill="x", padx=40, pady=(30, 40))
+        self.main_recent_section = tk.Frame(self.dashboard_container, bg=self.primary_bg)
+        self.main_recent_section.grid(row=0, column=1, sticky="nsew")
 
         header = tk.Label(
             self.main_recent_section,
@@ -684,11 +661,15 @@ class EbayListingApp:
         header.pack(anchor="w")
 
         self.main_recent_container = tk.Frame(self.main_recent_section, bg=self.primary_bg)
-        self.main_recent_container.pack(fill="x", pady=(12, 0))
+        self.main_recent_container.pack(fill="both", expand=True, pady=(12, 0))
 
     def _render_main_categories(self, categories: list[dict[str, str]]) -> None:
         for child in self.main_categories_container.winfo_children():
             child.destroy()
+
+        columns = 2
+        for col in range(columns):
+            self.main_categories_container.grid_columnconfigure(col, weight=1, uniform="categories")
 
         if not categories:
             placeholder = tk.Label(
@@ -698,64 +679,78 @@ class EbayListingApp:
                 bg=self.primary_bg,
                 fg="#5A6D82",
             )
-            placeholder.pack(anchor="w")
+            placeholder.grid(row=0, column=0, sticky="w")
             return
 
-        for category in categories:
+        for index, category in enumerate(categories):
+            row = index // columns
+            column = index % columns
             card = tk.Frame(
                 self.main_categories_container,
                 bg=self.card_bg,
                 highlightthickness=1,
                 highlightbackground="#D7E3F5",
-                padx=16,
-                pady=14,
+                padx=14,
+                pady=12,
             )
-            card.pack(fill="x", pady=(0, 12))
+            card.grid(row=row, column=column, padx=10, pady=10, sticky="nsew")
 
-            name_label = tk.Label(
+            tk.Label(
                 card,
                 text=category.get("name", ""),
-                font=("Segoe UI Semibold", 14),
+                font=("Segoe UI Semibold", 13),
                 bg=self.card_bg,
                 fg=self.text_color,
-            )
-            name_label.pack(anchor="w")
+            ).pack(anchor="w")
 
             description = category.get("description", "")
             if description:
-                description_label = tk.Label(
+                tk.Label(
                     card,
                     text=description,
-                    font=("Segoe UI", 11),
+                    font=("Segoe UI", 10),
                     bg=self.card_bg,
                     fg="#41566F",
-                    wraplength=480,
+                    wraplength=200,
                     justify="left",
-                )
-                description_label.pack(anchor="w", pady=(4, 6))
+                ).pack(anchor="w", pady=(4, 6))
 
             days = category.get("days")
             if days:
-                meta_label = tk.Label(
+                tk.Label(
                     card,
                     text=f"Duration: {days} day(s)",
-                    font=("Segoe UI", 10),
+                    font=("Segoe UI", 9),
                     bg=self.card_bg,
                     fg="#6F7F92",
-                )
-                meta_label.pack(anchor="w")
+                ).pack(anchor="w")
 
-            item_total = sum(1 for item in self.items if item.get("category") == category.get("name"))
-            count_label = tk.Label(
+            item_total = sum(
+                1
+                for item in self.items
+                if item.get("category") == category.get("name")
+                and (item.get("status") or "active").lower() != "ended"
+            )
+            tk.Label(
                 card,
-                text=f"Items in this category: {item_total}",
-                font=("Segoe UI", 10),
+                text=f"Active items: {item_total}",
+                font=("Segoe UI", 9),
                 bg=self.card_bg,
                 fg="#1E88E5" if item_total else "#6F7F92",
-            )
-            count_label.pack(anchor="w", pady=(6, 0))
+            ).pack(anchor="w", pady=(4, 8))
+
+            ttk.Button(
+                card,
+                text="Open",
+                style="Secondary.TButton",
+                command=lambda cat=category: self._open_category_from_main(cat),
+            ).pack(anchor="e")
 
         self._sync_main_scroll_region(None)
+
+    def _open_category_from_main(self, category: dict[str, str]) -> None:
+        self.show_add_category()
+        self.add_category_frame._open_category_items(category)
 
     def _update_categories_display(self, categories: list[dict[str, str]]) -> None:
         if hasattr(self, "main_categories_container"):

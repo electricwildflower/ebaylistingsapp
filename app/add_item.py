@@ -61,7 +61,6 @@ class AddItemView(tk.Frame):
         self._editing_item_id: str | None = None
         self._editing_item_status: str = "active"
         self._restore_on_save: bool = False
-        self._editing_item_status: str | None = None
 
         self._load_items()
         self._build_layout()
@@ -254,7 +253,6 @@ class AddItemView(tk.Frame):
         self._dialog_vars["date_added"].set(item.get("date_added", ""))
         self._dialog_vars["end_date"].set(item.get("end_date", ""))
         self._dialog_vars["image_url"].set(item.get("image_url", ""))
-        self._editing_item_status = item.get("status", "active")
         self._editing_item_status = item.get("status", "active")
         if self._description_text is not None:
             self._description_text.delete("1.0", "end")
