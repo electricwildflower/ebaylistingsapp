@@ -1,0 +1,13 @@
+Step 1 - Moving the app
+
+If it hasn't been already move the unzipped folder to your home directory
+
+Step 2 - Python Installation
+
+Download the latest Python from google making sure it's the 64bit version installer and get it installed unless you want to use the one included which either way is fine. Don't move onto the next step till Python has been installed
+
+Step 3 - under the app folder double click the install_requirements file and click run and let it do it's thing as it will add dependencies
+
+Step 4 - On your desktop right click >> New >> Shortcut and when asked browse to the apps folder and choose the main file and give the shortcut a name of Ebay app
+
+Step 5 - Once done now run the app using the shortcut link on the desktop

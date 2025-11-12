@@ -5,9 +5,12 @@ from __future__ import annotations
 import json
 import os
 import urllib.request
+from datetime import date
 from io import BytesIO
 from typing import Any, Callable
 from uuid import uuid4
+
+import calendar
 
 import tkinter as tk
 from tkinter import messagebox, ttk
@@ -49,6 +52,9 @@ class AddItemView(tk.Frame):
         self._notes_text: tk.Text | None = None
         self._image_preview_label: tk.Label | None = None
         self._image_photo: tk.PhotoImage | None = None  # keep reference
+        self._is_mousewheel_bound = False
+        self._date_picker_window: tk.Toplevel | None = None
+        self._date_picker_state: dict[str, Any] = {}
 
         self._load_items()
         self._build_layout()
@@ -61,8 +67,24 @@ class AddItemView(tk.Frame):
         container = tk.Frame(self, bg=self.primary_bg)
         container.pack(fill="both", expand=True, pady=(40, 0))
 
-        header = tk.Label(
+        self.canvas = tk.Canvas(
             container,
+            bg=self.primary_bg,
+            highlightthickness=0,
+            borderwidth=0,
+        )
+        self.canvas.pack(fill="both", expand=True)
+
+        self._canvas_frame = tk.Frame(self.canvas, bg=self.primary_bg)
+        self._canvas_window_id = self.canvas.create_window((0, 0), window=self._canvas_frame, anchor="nw")
+
+        self._canvas_frame.bind("<Configure>", self._sync_scroll_region)
+        self.canvas.bind("<Configure>", self._match_canvas_width)
+        self.canvas.bind("<Enter>", self._bind_mousewheel)
+        self.canvas.bind("<Leave>", self._unbind_mousewheel)
+
+        header = tk.Label(
+            self._canvas_frame,
             text="Add Items",
             font=("Segoe UI Semibold", 22),
             bg=self.primary_bg,
@@ -71,13 +93,13 @@ class AddItemView(tk.Frame):
         header.pack(pady=(0, 20))
 
         ttk.Button(
-            container,
+            self._canvas_frame,
             text="Add a New Item",
             style="Primary.TButton",
             command=self.open_add_item_dialog,
         ).pack()
 
-        self.items_list_container = tk.Frame(container, bg=self.primary_bg)
+        self.items_list_container = tk.Frame(self._canvas_frame, bg=self.primary_bg)
         self.items_list_container.pack(fill="both", expand=True, pady=(30, 0))
 
     def open_add_item_dialog(self) -> None:
@@ -139,10 +161,22 @@ class AddItemView(tk.Frame):
         self._notes_text.grid(row=5, column=0, sticky="we", pady=(4, 16))
 
         ttk.Label(parent, text="Date Added (YYYY-MM-DD)", style="TLabel").grid(row=6, column=0, sticky="w")
-        ttk.Entry(parent, textvariable=self._dialog_vars["date_added"]).grid(row=7, column=0, sticky="we", pady=(4, 16))
+        date_added_row = tk.Frame(parent, bg=self.card_bg)
+        date_added_row.grid(row=7, column=0, sticky="we", pady=(4, 16))
+        date_added_row.columnconfigure(0, weight=1)
+        ttk.Entry(date_added_row, textvariable=self._dialog_vars["date_added"]).grid(row=0, column=0, sticky="we")
+        ttk.Button(date_added_row, text="Pick Date", command=lambda: self._open_date_picker("date_added")).grid(
+            row=0, column=1, padx=(12, 0)
+        )
 
         ttk.Label(parent, text="End Date (YYYY-MM-DD)", style="TLabel").grid(row=8, column=0, sticky="w")
-        ttk.Entry(parent, textvariable=self._dialog_vars["end_date"]).grid(row=9, column=0, sticky="we", pady=(4, 16))
+        end_date_row = tk.Frame(parent, bg=self.card_bg)
+        end_date_row.grid(row=9, column=0, sticky="we", pady=(4, 16))
+        end_date_row.columnconfigure(0, weight=1)
+        ttk.Entry(end_date_row, textvariable=self._dialog_vars["end_date"]).grid(row=0, column=0, sticky="we")
+        ttk.Button(end_date_row, text="Pick Date", command=lambda: self._open_date_picker("end_date")).grid(
+            row=0, column=1, padx=(12, 0)
+        )
 
         ttk.Label(parent, text="Image URL", style="TLabel").grid(row=10, column=0, sticky="w")
         url_row = tk.Frame(parent, bg=self.card_bg)
@@ -261,6 +295,7 @@ class AddItemView(tk.Frame):
         self._notes_text = None
         self._image_preview_label = None
         self._image_photo = None
+        self._close_date_picker()
 
     # --------------------------------------------------------------------------------------------
     # Rendering
@@ -335,6 +370,8 @@ class AddItemView(tk.Frame):
                     fg="#6F7F92",
                 ).pack(anchor="w")
 
+        self._sync_scroll_region(None)
+
     # --------------------------------------------------------------------------------------------
     # Data helpers
     # --------------------------------------------------------------------------------------------
@@ -402,5 +439,175 @@ class AddItemView(tk.Frame):
     def _notify_items_changed(self) -> None:
         if self._items_changed_callback:
             self._items_changed_callback(self.get_items())
+
+    # --------------------------------------------------------------------------------------------
+    # Scrolling helpers
+    # --------------------------------------------------------------------------------------------
+    def _sync_scroll_region(self, _: Any) -> None:
+        if hasattr(self, "canvas"):
+            self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def _match_canvas_width(self, event: Any) -> None:
+        if hasattr(self, "canvas"):
+            self.canvas.itemconfigure(self._canvas_window_id, width=event.width)
+
+    def _bind_mousewheel(self, _: Any) -> None:
+        if self._is_mousewheel_bound:
+            return
+        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        self.canvas.bind_all("<Button-4>", self._on_mousewheel)
+        self.canvas.bind_all("<Button-5>", self._on_mousewheel)
+        self._is_mousewheel_bound = True
+
+    def _unbind_mousewheel(self, _: Any) -> None:
+        if not self._is_mousewheel_bound:
+            return
+        self.canvas.unbind_all("<MouseWheel>")
+        self.canvas.unbind_all("<Button-4>")
+        self.canvas.unbind_all("<Button-5>")
+        self._is_mousewheel_bound = False
+
+    def _on_mousewheel(self, event: Any) -> None:
+        if event.num == 4 or (hasattr(event, "delta") and event.delta > 0):
+            self.canvas.yview_scroll(-1, "units")
+        elif event.num == 5 or (hasattr(event, "delta") and event.delta < 0):
+            self.canvas.yview_scroll(1, "units")
+
+    # --------------------------------------------------------------------------------------------
+    # Date picker helpers
+    # --------------------------------------------------------------------------------------------
+    def _open_date_picker(self, target_field: str) -> None:
+        if not self._dialog:
+            return
+
+        self._close_date_picker()
+
+        today = date.today()
+        current_value = self._dialog_vars[target_field].get().strip()
+        year = today.year
+        month = today.month
+        try:
+            if current_value:
+                parsed = date.fromisoformat(current_value)
+                year = parsed.year
+                month = parsed.month
+        except ValueError:
+            pass
+
+        self._date_picker_state = {"field": target_field, "year": year, "month": month}
+
+        self._date_picker_window = tk.Toplevel(self._dialog)
+        self._date_picker_window.transient(self._dialog)
+        self._date_picker_window.grab_set()
+        self._date_picker_window.resizable(False, False)
+        self._date_picker_window.title("Select Date")
+
+        frame = tk.Frame(self._date_picker_window, bg=self.primary_bg, padx=12, pady=12)
+        frame.pack(fill="both", expand=True)
+
+        header = tk.Frame(frame, bg=self.primary_bg)
+        header.pack(fill="x", pady=(0, 8))
+
+        ttk.Button(header, text="<", width=3, command=lambda: self._shift_date_month(-1)).pack(side="left")
+        self._date_label = tk.Label(
+            header,
+            text="",
+            font=("Segoe UI Semibold", 12),
+            bg=self.primary_bg,
+            fg=self.text_color,
+        )
+        self._date_label.pack(side="left", expand=True)
+        ttk.Button(header, text=">", width=3, command=lambda: self._shift_date_month(1)).pack(side="right")
+
+        self._calendar_container = tk.Frame(frame, bg=self.primary_bg)
+        self._calendar_container.pack()
+
+        ttk.Button(
+            frame,
+            text="Cancel",
+            style="Secondary.TButton",
+            command=self._close_date_picker,
+        ).pack(pady=(10, 0))
+
+        self._render_calendar_grid()
+
+    def _shift_date_month(self, delta: int) -> None:
+        if not self._date_picker_state:
+            return
+        year = self._date_picker_state["year"]
+        month = self._date_picker_state["month"] + delta
+        while month < 1:
+            month += 12
+            year -= 1
+        while month > 12:
+            month -= 12
+            year += 1
+        self._date_picker_state["year"] = year
+        self._date_picker_state["month"] = month
+        self._render_calendar_grid()
+
+    def _render_calendar_grid(self) -> None:
+        if not self._date_picker_state:
+            return
+
+        for child in self._calendar_container.winfo_children():
+            child.destroy()
+
+        year = self._date_picker_state["year"]
+        month = self._date_picker_state["month"]
+
+        if hasattr(self, "_date_label"):
+            self._date_label.configure(text=f"{calendar.month_name[month]} {year}")
+
+        weekday_header = tk.Frame(self._calendar_container, bg=self.primary_bg)
+        weekday_header.pack()
+        for weekday in ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]:
+            tk.Label(
+                weekday_header,
+                text=weekday,
+                width=4,
+                font=("Segoe UI", 10),
+                bg=self.primary_bg,
+                fg=self.text_color,
+            ).pack(side="left")
+
+        for week in calendar.monthcalendar(year, month):
+            row = tk.Frame(self._calendar_container, bg=self.primary_bg)
+            row.pack()
+            for day in week:
+                if day == 0:
+                    tk.Label(row, text=" ", width=4, bg=self.primary_bg).pack(side="left")
+                    continue
+
+                btn = ttk.Button(
+                    row,
+                    text=str(day),
+                    width=4,
+                    command=lambda d=day: self._select_date(d),
+                )
+                btn.pack(side="left")
+
+    def _select_date(self, day: int) -> None:
+        if not self._date_picker_state:
+            return
+        try:
+            selected = date(
+                self._date_picker_state["year"],
+                self._date_picker_state["month"],
+                day,
+            )
+        except ValueError:
+            return
+        field = self._date_picker_state.get("field")
+        if field and field in self._dialog_vars:
+            self._dialog_vars[field].set(selected.isoformat())
+        self._close_date_picker()
+
+    def _close_date_picker(self) -> None:
+        if self._date_picker_window and self._date_picker_window.winfo_exists():
+            self._date_picker_window.grab_release()
+            self._date_picker_window.destroy()
+        self._date_picker_window = None
+        self._date_picker_state = {}
 
 
