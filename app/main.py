@@ -322,6 +322,7 @@ class EbayListingApp:
 
         self._build_main_categories_section()
         self._build_recent_items_section()
+        self._search_mode = False
 
         default_base = self._default_storage_base_path()
         self.first_run_frame = FirstRunWizard(
@@ -731,18 +732,18 @@ class EbayListingApp:
     # Global search helpers
     # --------------------------------------------------------------------------------------------
     def _build_global_search(self) -> None:
-        search_wrapper = tk.Frame(self.main_frame, bg=self.primary_bg)
-        search_wrapper.pack(fill="x", padx=40, pady=(0, 24))
+        self.global_search_wrapper = tk.Frame(self.main_frame, bg=self.primary_bg)
+        self.global_search_wrapper.pack(fill="x", padx=40, pady=(0, 24))
 
         ttk.Label(
-            search_wrapper,
+            self.global_search_wrapper,
             text="Search across categories and items",
             background=self.primary_bg,
             foreground=self.text_color,
             font=("Segoe UI", 11),
         ).pack(anchor="w")
 
-        row = tk.Frame(search_wrapper, bg=self.primary_bg)
+        row = tk.Frame(self.global_search_wrapper, bg=self.primary_bg)
         row.pack(fill="x", pady=(8, 0))
 
         self.global_search_var = tk.StringVar()
@@ -757,8 +758,17 @@ class EbayListingApp:
             command=lambda: self._perform_global_search(self.global_search_var.get()),
         ).pack(side="left", padx=(8, 0))
 
-        self.global_search_results = tk.Frame(search_wrapper, bg=self.primary_bg)
-        self.global_search_results.pack(fill="x", pady=(12, 0))
+        self.global_search_clear_btn = ttk.Button(
+            row,
+            text="Clear",
+            style="Secondary.TButton",
+            command=self._clear_search,
+        )
+        self.global_search_clear_btn.pack(side="left", padx=(8, 0))
+        self._set_clear_search_enabled(False)
+
+        self.global_search_results = tk.Frame(self.global_search_wrapper, bg=self.primary_bg)
+        self.global_search_results.pack(fill="both", expand=True, pady=(12, 0))
 
         self.global_search_var.trace_add("write", self._handle_global_search_update)
 
@@ -766,7 +776,9 @@ class EbayListingApp:
         query = self.global_search_var.get().strip()
         if not query:
             self._clear_global_search_results()
-        elif len(query) >= 2:
+            self._set_search_mode(False)
+            self._set_clear_search_enabled(False)
+        else:
             self._perform_global_search(query)
 
     def _clear_global_search_results(self) -> None:
@@ -774,26 +786,37 @@ class EbayListingApp:
             child.destroy()
 
     def _perform_global_search(self, query: str) -> None:
-        query = (query or "").strip().lower()
-        self._clear_global_search_results()
-        if not query:
+        raw_query = query or ""
+        query_str = raw_query.strip()
+        if not query_str:
+            self._clear_global_search_results()
+            self._set_search_mode(False)
+            self._set_clear_search_enabled(False)
             return
+
+        query_lower = query_str.lower()
+        self._clear_global_search_results()
 
         categories = self.add_category_frame.get_categories()
         items = self.add_item_frame.get_items()
         results: list[tuple[str, dict[str, Any]]] = []
 
         for category in categories:
-            if query in category.get("name", "").lower() or query in category.get("description", "").lower():
+            name = category.get("name", "")
+            description = category.get("description", "")
+            if query_lower in name.lower() or query_lower in description.lower():
                 results.append(("category", category))
 
         for item in items:
             if (
-                query in (item.get("name") or "").lower()
-                or query in (item.get("description") or "").lower()
-                or query in (item.get("notes") or "").lower()
+                query_lower in (item.get("name") or "").lower()
+                or query_lower in (item.get("description") or "").lower()
+                or query_lower in (item.get("notes") or "").lower()
             ):
                 results.append(("item", item))
+
+        self._set_search_mode(True)
+        self._set_clear_search_enabled(True)
 
         if not results:
             tk.Label(
@@ -1003,6 +1026,31 @@ class EbayListingApp:
 
     def _get_items_list(self) -> list[dict[str, Any]]:
         return self.add_item_frame.get_items()
+
+    def _set_search_mode(self, active: bool) -> None:
+        current = getattr(self, "_search_mode", False)
+        if active and not current:
+            if self.dashboard_container.winfo_ismapped():
+                self.dashboard_container.pack_forget()
+            self._search_mode = True
+        elif not active and current:
+            if not self.dashboard_container.winfo_ismapped():
+                self.dashboard_container.pack(fill="both", expand=True, padx=40, pady=(12, 40))
+            self._search_mode = False
+
+    def _set_clear_search_enabled(self, enabled: bool) -> None:
+        if not hasattr(self, "global_search_clear_btn"):
+            return
+        if enabled:
+            self.global_search_clear_btn.state(["!disabled"])
+        else:
+            self.global_search_clear_btn.state(["disabled"])
+
+    def _clear_search(self) -> None:
+        self.global_search_var.set("")
+        self._clear_global_search_results()
+        self._set_search_mode(False)
+        self._set_clear_search_enabled(False)
 
 
 def main() -> None:
