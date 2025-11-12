@@ -21,6 +21,7 @@ class AddCategoryView(tk.Frame):
         text_color: str,
         storage_path: str | None = None,
         on_categories_changed: Callable[[list[dict[str, str]]], None] | None = None,
+        items_provider: Callable[[], list[dict[str, Any]]] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(master, bg=primary_bg, **kwargs)
@@ -37,6 +38,7 @@ class AddCategoryView(tk.Frame):
         self._dialog_days_var: tk.StringVar | None = None
         self._dialog_description: tk.Text | None = None
         self._categories_changed_callback = on_categories_changed
+        self._items_provider = items_provider
 
         self.search_value = tk.StringVar()
         self.search_value.trace_add("write", self._handle_search_change)
@@ -359,7 +361,7 @@ class AddCategoryView(tk.Frame):
                 actions,
                 text="Open",
                 style="Secondary.TButton",
-                command=lambda cat=category: self._open_category(cat),
+                command=lambda cat=category: self._open_category_items(cat),
             ).pack(side="left", padx=(0, 8))
 
             ttk.Button(
@@ -376,12 +378,103 @@ class AddCategoryView(tk.Frame):
                 command=lambda idx=original_index: self._delete_category(idx),
             ).pack(side="left")
 
-    def _open_category(self, category: dict[str, str]) -> None:  # pragma: no cover - placeholder
-        messagebox.showinfo(
-            "Open Category",
-            f"The category \"{category['name']}\" will open listings soon.",
-            parent=self.winfo_toplevel(),
+    def _open_category_items(self, category: dict[str, str]) -> None:
+        if self._dialog_backdrop and self._dialog_backdrop.winfo_exists():
+            self._close_dialog()
+
+        items: list[dict[str, Any]] = []
+        if self._items_provider:
+            try:
+                items = [
+                    item
+                    for item in self._items_provider()
+                    if item.get("category") == category.get("name")
+                ]
+            except Exception:
+                items = []
+
+        self._dialog_mode = "view"
+        self._dialog_backdrop = tk.Frame(self, bg=self.primary_bg)
+        self._dialog_backdrop.place(relx=0, rely=0, relwidth=1, relheight=1)
+        self._dialog_backdrop.lift()
+
+        wrapper = tk.Frame(self._dialog_backdrop, bg=self.primary_bg)
+        wrapper.pack(expand=True, pady=60)
+
+        header = tk.Label(
+            wrapper,
+            text=f"Items in \"{category.get('name', '')}\"",
+            font=("Segoe UI Semibold", 20),
+            bg=self.primary_bg,
+            fg=self.text_color,
+            wraplength=560,
         )
+        header.pack(pady=(0, 16))
+
+        self._dialog = tk.Frame(wrapper, bg=self.card_bg, padx=24, pady=24)
+        self._dialog.pack()
+
+        container = tk.Frame(self._dialog, bg=self.card_bg)
+        container.pack(fill="both", expand=True)
+
+        if not items:
+            tk.Label(
+                container,
+                text="No items have been added to this category yet.",
+                font=("Segoe UI", 12),
+                bg=self.card_bg,
+                fg="#5A6D82",
+            ).pack()
+        else:
+            for item in items:
+                card = tk.Frame(
+                    container,
+                    bg=self.card_bg,
+                    highlightthickness=1,
+                    highlightbackground="#D7E3F5",
+                    padx=16,
+                    pady=12,
+                )
+                card.pack(fill="x", pady=(0, 12))
+
+                title = tk.Label(
+                    card,
+                    text=item.get("description", "Item"),
+                    font=("Segoe UI Semibold", 13),
+                    bg=self.card_bg,
+                    fg=self.text_color,
+                )
+                title.pack(anchor="w")
+
+                notes = item.get("notes")
+                if notes:
+                    tk.Label(
+                        card,
+                        text=f"Notes: {notes}",
+                        font=("Segoe UI", 10),
+                        bg=self.card_bg,
+                        fg="#41566F",
+                        wraplength=480,
+                        justify="left",
+                    ).pack(anchor="w", pady=(4, 4))
+
+                dates = []
+                if item.get("date_added"):
+                    dates.append(f"Added: {item['date_added']}")
+                if item.get("end_date"):
+                    dates.append(f"End: {item['end_date']}")
+                if dates:
+                    tk.Label(
+                        card,
+                        text=" • ".join(dates),
+                        font=("Segoe UI", 10),
+                        bg=self.card_bg,
+                        fg="#6F7F92",
+                    ).pack(anchor="w")
+
+        button_row = tk.Frame(self._dialog, bg=self.card_bg)
+        button_row.pack(anchor="e", pady=(8, 0))
+        ttk.Button(button_row, text="Close", style="Secondary.TButton", command=self._close_dialog).pack()
 
     def set_storage_path(self, storage_path: str) -> None:
         self.storage_path = storage_path

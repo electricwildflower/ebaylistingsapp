@@ -19,6 +19,11 @@ try:
 except ImportError:
     from add_category import AddCategoryView
 
+try:
+    from .add_item import AddItemView
+except ImportError:
+    from add_item import AddItemView
+
 
 class EbayListingApp:
     def __init__(self) -> None:
@@ -29,6 +34,7 @@ class EbayListingApp:
         self.root.resizable(False, False)
         self.is_fullscreen = False
         self._main_mousewheel_bound = False
+        self.items: list[dict[str, Any]] = []
 
         self.primary_bg = "#F2F7FF"
         self.accent_color = "#1E88E5"
@@ -270,8 +276,16 @@ class EbayListingApp:
             text_color=self.text_color,
             storage_path=self.storage_path,
             on_categories_changed=self._update_categories_display,
+            items_provider=lambda: self.items,
         )
-        self.add_item_frame = tk.Frame(self.content_container, bg=self.primary_bg)
+        self.add_item_frame = AddItemView(
+            self.content_container,
+            primary_bg=self.primary_bg,
+            text_color=self.text_color,
+            storage_path=self.storage_path,
+            categories_provider=self.add_category_frame.get_categories,
+            on_items_changed=self._update_items_display,
+        )
         self.readd_item_frame = tk.Frame(self.content_container, bg=self.primary_bg)
         self.remove_item_frame = tk.Frame(self.content_container, bg=self.primary_bg)
         self.end_item_frame = tk.Frame(self.content_container, bg=self.primary_bg)
@@ -301,6 +315,7 @@ class EbayListingApp:
         card_label.pack()
 
         self._build_main_categories_section()
+        self._build_recent_items_section()
 
         item_label = tk.Label(
             self.add_item_frame,
@@ -389,7 +404,8 @@ class EbayListingApp:
         )
         storage_button.pack(pady=(18, 0), fill="x")
 
-        self._render_main_categories(self.add_category_frame.get_categories())
+        self._update_categories_display(self.add_category_frame.get_categories())
+        self._update_items_display(self.add_item_frame.get_items())
 
         default_base = self._default_storage_base_path()
         self.first_run_frame = FirstRunWizard(
@@ -435,7 +451,10 @@ class EbayListingApp:
         self._show_frame(self.add_category_frame)
 
     def show_add_item(self) -> None:
-        self.show_add_category()
+        self._show_top_bar()
+        self._show_frame(self.add_item_frame)
+        if isinstance(self.add_item_frame, AddItemView):
+            self.add_item_frame.open_add_item_dialog()
 
     def show_readd_item(self) -> None:
         self._show_top_bar()
@@ -506,6 +525,8 @@ class EbayListingApp:
         self.storage_path = config_dir
         if hasattr(self, "add_category_frame"):
             self.add_category_frame.set_storage_path(config_dir)
+        if hasattr(self, "add_item_frame"):
+            self.add_item_frame.set_storage_path(config_dir)
         if hasattr(self, "storage_value"):
             self.storage_value.set(f"Current storage folder:\n{config_dir}")
         self._save_config()
@@ -613,6 +634,22 @@ class EbayListingApp:
         self.main_categories_container = tk.Frame(self.main_categories_section, bg=self.primary_bg)
         self.main_categories_container.pack(fill="x", pady=(12, 0))
 
+    def _build_recent_items_section(self) -> None:
+        self.main_recent_section = tk.Frame(self.main_frame, bg=self.primary_bg)
+        self.main_recent_section.pack(fill="x", padx=40, pady=(30, 40))
+
+        header = tk.Label(
+            self.main_recent_section,
+            text="Recently Added Items",
+            font=("Segoe UI Semibold", 20),
+            bg=self.primary_bg,
+            fg=self.text_color,
+        )
+        header.pack(anchor="w")
+
+        self.main_recent_container = tk.Frame(self.main_recent_section, bg=self.primary_bg)
+        self.main_recent_container.pack(fill="x", pady=(12, 0))
+
     def _render_main_categories(self, categories: list[dict[str, str]]) -> None:
         for child in self.main_categories_container.winfo_children():
             child.destroy()
@@ -672,11 +709,90 @@ class EbayListingApp:
                 )
                 meta_label.pack(anchor="w")
 
+            item_total = sum(1 for item in self.items if item.get("category") == category.get("name"))
+            count_label = tk.Label(
+                card,
+                text=f"Items in this category: {item_total}",
+                font=("Segoe UI", 10),
+                bg=self.card_bg,
+                fg="#1E88E5" if item_total else "#6F7F92",
+            )
+            count_label.pack(anchor="w", pady=(6, 0))
+
         self._sync_main_scroll_region(None)
 
     def _update_categories_display(self, categories: list[dict[str, str]]) -> None:
         if hasattr(self, "main_categories_container"):
             self._render_main_categories(categories)
+
+    def _render_recent_items(self) -> None:
+        if not hasattr(self, "main_recent_container"):
+            return
+
+        for child in self.main_recent_container.winfo_children():
+            child.destroy()
+
+        if not self.items:
+            placeholder = tk.Label(
+                self.main_recent_container,
+                text="No items have been added yet.",
+                font=("Segoe UI", 12),
+                bg=self.primary_bg,
+                fg="#5A6D82",
+            )
+            placeholder.pack(anchor="w")
+            return
+
+        for item in reversed(self.items[-10:]):
+            card = tk.Frame(
+                self.main_recent_container,
+                bg=self.card_bg,
+                highlightthickness=1,
+                highlightbackground="#D7E3F5",
+                padx=16,
+                pady=12,
+            )
+            card.pack(fill="x", pady=(0, 12))
+
+            title = tk.Label(
+                card,
+                text=f"{item.get('description', 'Item')} • {item.get('category', 'No category')}",
+                font=("Segoe UI Semibold", 13),
+                bg=self.card_bg,
+                fg=self.text_color,
+            )
+            title.pack(anchor="w")
+
+            notes = item.get("notes")
+            if notes:
+                tk.Label(
+                    card,
+                    text=f"Notes: {notes}",
+                    font=("Segoe UI", 10),
+                    bg=self.card_bg,
+                    fg="#41566F",
+                    wraplength=520,
+                    justify="left",
+                ).pack(anchor="w", pady=(4, 4))
+
+            dates = []
+            if item.get("date_added"):
+                dates.append(f"Added: {item['date_added']}")
+            if item.get("end_date"):
+                dates.append(f"End: {item['end_date']}")
+            if dates:
+                tk.Label(
+                    card,
+                    text=" • ".join(dates),
+                    font=("Segoe UI", 10),
+                    bg=self.card_bg,
+                    fg="#6F7F92",
+                ).pack(anchor="w")
+
+    def _update_items_display(self, items: list[dict[str, Any]]) -> None:
+        self.items = items
+        self._render_recent_items()
+        self._render_main_categories(self.add_category_frame.get_categories())
 
     def _sync_main_scroll_region(self, _: Any) -> None:
         if hasattr(self, "main_scroll_canvas"):
