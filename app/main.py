@@ -1,7 +1,7 @@
 import json
 import os
 import tkinter as tk
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 from tkinter import filedialog, messagebox, ttk
 
@@ -36,6 +36,18 @@ except ImportError:  # pragma: no cover
     from end_items import EndItemsView
 
 
+def _format_date_display(value: str | None) -> str:
+    if not value:
+        return ""
+    value = value.strip()
+    for fmt in ("%Y-%m-%d", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(value, fmt).strftime("%d-%m-%Y")
+        except ValueError:
+            continue
+    return value
+
+
 class EbayListingApp:
     def __init__(self) -> None:
         self.root = tk.Tk()
@@ -61,6 +73,7 @@ class EbayListingApp:
 
         self._create_top_bar()
         self._create_content_container()
+        self._active_frame: tk.Widget | None = None
         self._create_frames()
         self._apply_window_mode()
 
@@ -363,8 +376,11 @@ class EbayListingApp:
         ):
             widget.pack_forget()
         frame.pack(fill="both", expand=True)
+        self._active_frame = frame
         if frame is self.main_scroll_canvas:
             self._sync_main_scroll_region(None)
+        if frame is not self.add_item_frame and hasattr(self, "add_item_frame"):
+            self.add_item_frame.close_item_details()
 
     # --------------------------------------------------------------------------------------------
     # Navigation
@@ -386,9 +402,12 @@ class EbayListingApp:
         self._show_frame(self.add_category_frame)
 
     def show_add_item(self) -> None:
+        previous_frame = getattr(self, "_active_frame", None)
         self._show_top_bar()
         self._show_frame(self.add_item_frame)
-        self.add_item_frame.open_add_item_dialog()
+        self.add_item_frame.open_add_item_dialog(
+            on_close=lambda cancelled: self._return_to_frame(previous_frame)
+        )
 
     def show_items_added(self) -> None:
         self._show_top_bar()
@@ -661,9 +680,9 @@ class EbayListingApp:
         if item.get("category"):
             details.append(f"Category: {item['category']}")
         if item.get("date_added"):
-            details.append(f"Added: {item['date_added']}")
+            details.append(f"Added: {_format_date_display(item.get('date_added'))}")
         if item.get("end_date"):
-            details.append(f"End: {item['end_date']}")
+            details.append(f"End: {_format_date_display(item.get('end_date'))}")
         status = (item.get("status") or "active").capitalize()
         details.append(f"Status: {status}")
         tk.Label(
@@ -714,9 +733,14 @@ class EbayListingApp:
             self._perform_global_search(self.global_search_var.get())
 
     def _edit_item(self, item_id: str, restore: bool = False) -> None:
+        previous_frame = getattr(self, "_active_frame", None)
         self._show_top_bar()
         self._show_frame(self.add_item_frame)
-        self.add_item_frame.edit_item(item_id, restore_on_save=restore)
+        self.add_item_frame.edit_item(
+            item_id,
+            restore_on_save=restore,
+            on_close=lambda cancelled: self._return_to_frame(previous_frame),
+        )
 
     def _delete_item(self, item_id: str) -> None:
         self.add_item_frame.delete_item(item_id)
@@ -728,7 +752,13 @@ class EbayListingApp:
         self.add_item_frame.restore_item(item_id)
 
     def _open_item_details(self, item_id: str) -> None:
-        self.add_item_frame.open_item_details(item_id)
+        previous_frame = getattr(self, "_active_frame", None)
+        self._show_top_bar()
+        self._show_frame(self.add_item_frame)
+        self.add_item_frame.open_item_details(
+            item_id,
+            on_back=lambda: self._return_to_frame(previous_frame),
+        )
 
     # --------------------------------------------------------------------------------------------
     # Global search helpers
@@ -882,9 +912,9 @@ class EbayListingApp:
                 if payload.get("category"):
                     details.append(f"Category: {payload['category']}")
                 if payload.get("date_added"):
-                    details.append(f"Added: {payload['date_added']}")
+                    details.append(f"Added: {_format_date_display(payload.get('date_added'))}")
                 if payload.get("end_date"):
-                    details.append(f"End: {payload['end_date']}")
+                    details.append(f"End: {_format_date_display(payload.get('end_date'))}")
                 status = (payload.get("status") or "active").capitalize()
                 details.append(f"Status: {status}")
                 tk.Label(
@@ -1058,6 +1088,24 @@ class EbayListingApp:
         self._clear_global_search_results()
         self._set_search_mode(False)
         self._set_clear_search_enabled(False)
+
+    def _return_to_frame(self, frame: tk.Widget | None) -> None:
+        if hasattr(self, "add_item_frame"):
+            self.add_item_frame.close_item_details()
+        if frame is self.main_scroll_canvas or frame is None:
+            self.show_main()
+        elif frame is self.items_added_frame:
+            self.show_items_added()
+        elif frame is self.end_item_frame:
+            self.show_end_item()
+        elif frame is self.add_category_frame:
+            self.show_add_category()
+        elif frame is self.settings_view:
+            self.show_settings()
+        elif frame is self.storage_config_frame:
+            self.show_storage_config()
+        else:
+            self.show_main()
 
 
 def main() -> None:

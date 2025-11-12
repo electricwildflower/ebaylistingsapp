@@ -9,6 +9,18 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 
+def _format_date_display(value: str | None) -> str:
+    if not value:
+        return ""
+    value = value.strip()
+    for fmt in ("%Y-%m-%d", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(value, fmt).strftime("%d-%m-%Y")
+        except ValueError:
+            continue
+    return value
+
+
 class ItemsAddedView(tk.Frame):
     """Displays saved items with search and ordering controls."""
 
@@ -159,6 +171,8 @@ class ItemsAddedView(tk.Frame):
                 or search_text in (item.get("description") or "").lower()
                 or search_text in (item.get("notes") or "").lower()
                 or search_text in (item.get("category") or "").lower()
+                or search_text in _format_date_display(item.get("date_added")).lower()
+                or search_text in _format_date_display(item.get("end_date")).lower()
             ]
         else:
             filtered = list(base_items)
@@ -260,9 +274,9 @@ class ItemsAddedView(tk.Frame):
             if item.get("category"):
                 subtitle_parts.append(f"Category: {item['category']}")
             if item.get("date_added"):
-                subtitle_parts.append(f"Added: {item['date_added']}")
+                subtitle_parts.append(f"Added: {_format_date_display(item.get('date_added'))}")
             if item.get("end_date"):
-                subtitle_parts.append(f"End: {item['end_date']}")
+                subtitle_parts.append(f"End: {_format_date_display(item.get('end_date'))}")
             if subtitle_parts:
                 tk.Label(
                     info,

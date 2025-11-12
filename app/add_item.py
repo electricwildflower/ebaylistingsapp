@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os
 import urllib.request
-from datetime import date
+from datetime import date, datetime
 from io import BytesIO
 from typing import Any, Callable
 from uuid import uuid4
@@ -61,10 +61,54 @@ class AddItemView(tk.Frame):
         self._editing_item_id: str | None = None
         self._editing_item_status: str = "active"
         self._restore_on_save: bool = False
+        self._dialog_on_close: Callable[[bool], None] | None = None
+        self._detail_overlay: tk.Frame | None = None
+        self._detail_callback: Callable[[], None] | None = None
 
         self._load_items()
         self._build_layout()
         self._render_items_list()
+
+    DATE_STORAGE_FORMAT = "%Y-%m-%d"
+    DATE_DISPLAY_FORMAT = "%d-%m-%Y"
+
+    def _date_to_display(self, value: date) -> str:
+        return value.strftime(self.DATE_DISPLAY_FORMAT)
+
+    def _format_date_for_display(self, value: str | None) -> str:
+        if not value:
+            return ""
+        value = value.strip()
+        for fmt in (self.DATE_STORAGE_FORMAT, self.DATE_DISPLAY_FORMAT):
+            try:
+                parsed = datetime.strptime(value, fmt)
+                return parsed.strftime(self.DATE_DISPLAY_FORMAT)
+            except ValueError:
+                continue
+        return value
+
+    def _convert_display_to_storage(self, value: str) -> str | None:
+        if not value:
+            return ""
+        value = value.strip()
+        for fmt in (self.DATE_DISPLAY_FORMAT, self.DATE_STORAGE_FORMAT):
+            try:
+                parsed = datetime.strptime(value, fmt)
+                return parsed.strftime(self.DATE_STORAGE_FORMAT)
+            except ValueError:
+                continue
+        return None
+
+    def _parse_date_string(self, value: str) -> date | None:
+        if not value:
+            return None
+        value = value.strip()
+        for fmt in (self.DATE_DISPLAY_FORMAT, self.DATE_STORAGE_FORMAT):
+            try:
+                return datetime.strptime(value, fmt).date()
+            except ValueError:
+                continue
+        return None
 
     # --------------------------------------------------------------------------------------------
     # UI construction
@@ -96,19 +140,24 @@ class AddItemView(tk.Frame):
             bg=self.primary_bg,
             fg=self.text_color,
         )
-        header.pack(pady=(0, 20))
+        header.pack_forget()
 
-        ttk.Button(
+        add_button = ttk.Button(
             self._canvas_frame,
             text="Add a New Item",
             style="Primary.TButton",
             command=self.open_add_item_dialog,
-        ).pack()
+        )
+        add_button.pack_forget()
 
         self.items_list_container = tk.Frame(self._canvas_frame, bg=self.primary_bg)
-        self.items_list_container.pack(fill="both", expand=True, pady=(30, 0))
+        self.items_list_container.pack_forget()
 
-    def open_add_item_dialog(self, item_id: str | None = None) -> None:
+    def open_add_item_dialog(
+        self,
+        item_id: str | None = None,
+        on_close: Callable[[bool], None] | None = None,
+    ) -> None:
         if not self.storage_path:
             messagebox.showerror(
                 "Add Item",
@@ -117,6 +166,8 @@ class AddItemView(tk.Frame):
             )
             return
 
+        self._close_detail_overlay()
+
         self._editing_item_id = item_id
         if item_id is None:
             self._restore_on_save = False
@@ -124,7 +175,10 @@ class AddItemView(tk.Frame):
         self._editing_item_status = item_data.get("status", "active") if item_data else "active"
 
         if self._dialog_backdrop and self._dialog_backdrop.winfo_exists():
+            self._dialog_on_close = None
             self._close_dialog()
+
+        self._dialog_on_close = on_close
 
         self._dialog_backdrop = tk.Frame(self, bg=self.primary_bg)
         self._dialog_backdrop.place(relx=0, rely=0, relwidth=1, relheight=1)
@@ -147,8 +201,8 @@ class AddItemView(tk.Frame):
             bg=self.card_bg,
             highlightthickness=0,
             borderwidth=0,
-            height=520,
-            width=560,
+            height=640,
+            width=720,
         )
         self._dialog_canvas.pack(fill="both", expand=True)
 
@@ -169,7 +223,7 @@ class AddItemView(tk.Frame):
         categories = self._category_names()
         self._dialog_vars["category"] = tk.StringVar(value=categories[0] if categories else "")
         self._dialog_vars["name"] = tk.StringVar()
-        self._dialog_vars["date_added"] = tk.StringVar()
+        self._dialog_vars["date_added"] = tk.StringVar(value=self._date_to_display(date.today()))
         self._dialog_vars["end_date"] = tk.StringVar()
         self._dialog_vars["image_url"] = tk.StringVar()
 
@@ -184,30 +238,36 @@ class AddItemView(tk.Frame):
         self.category_combo.grid(row=1, column=0, sticky="we", pady=(4, 16))
 
         ttk.Label(parent, text="Item Name", style="TLabel").grid(row=2, column=0, sticky="w")
-        ttk.Entry(parent, textvariable=self._dialog_vars["name"]).grid(row=3, column=0, sticky="we", pady=(4, 16))
+        ttk.Entry(parent, textvariable=self._dialog_vars["name"], width=54).grid(
+            row=3, column=0, sticky="we", pady=(4, 16)
+        )
 
         ttk.Label(parent, text="Description", style="TLabel").grid(row=4, column=0, sticky="w")
-        self._description_text = tk.Text(parent, width=44, height=4, font=("Segoe UI", 11))
+        self._description_text = tk.Text(parent, width=64, height=6, font=("Segoe UI", 11))
         self._description_text.grid(row=5, column=0, sticky="we", pady=(4, 16))
 
         ttk.Label(parent, text="Notes", style="TLabel").grid(row=6, column=0, sticky="w")
-        self._notes_text = tk.Text(parent, width=44, height=3, font=("Segoe UI", 11))
+        self._notes_text = tk.Text(parent, width=64, height=4, font=("Segoe UI", 11))
         self._notes_text.grid(row=7, column=0, sticky="we", pady=(4, 16))
 
-        ttk.Label(parent, text="Date Added (YYYY-MM-DD)", style="TLabel").grid(row=8, column=0, sticky="w")
+        ttk.Label(parent, text="Date Added (DD-MM-YYYY)", style="TLabel").grid(row=8, column=0, sticky="w")
         date_added_row = tk.Frame(parent, bg=self.card_bg)
         date_added_row.grid(row=9, column=0, sticky="we", pady=(4, 16))
         date_added_row.columnconfigure(0, weight=1)
-        ttk.Entry(date_added_row, textvariable=self._dialog_vars["date_added"]).grid(row=0, column=0, sticky="we")
+        ttk.Entry(date_added_row, textvariable=self._dialog_vars["date_added"], width=52).grid(
+            row=0, column=0, sticky="we"
+        )
         ttk.Button(date_added_row, text="Pick Date", command=lambda: self._open_date_picker("date_added")).grid(
             row=0, column=1, padx=(12, 0)
         )
 
-        ttk.Label(parent, text="End Date (YYYY-MM-DD)", style="TLabel").grid(row=10, column=0, sticky="w")
+        ttk.Label(parent, text="End Date (DD-MM-YYYY)", style="TLabel").grid(row=10, column=0, sticky="w")
         end_date_row = tk.Frame(parent, bg=self.card_bg)
         end_date_row.grid(row=11, column=0, sticky="we", pady=(4, 16))
         end_date_row.columnconfigure(0, weight=1)
-        ttk.Entry(end_date_row, textvariable=self._dialog_vars["end_date"]).grid(row=0, column=0, sticky="we")
+        ttk.Entry(end_date_row, textvariable=self._dialog_vars["end_date"], width=52).grid(
+            row=0, column=0, sticky="we"
+        )
         ttk.Button(end_date_row, text="Pick Date", command=lambda: self._open_date_picker("end_date")).grid(
             row=0, column=1, padx=(12, 0)
         )
@@ -217,7 +277,9 @@ class AddItemView(tk.Frame):
         url_row.grid(row=13, column=0, sticky="we", pady=(4, 12))
         url_row.columnconfigure(0, weight=1)
 
-        ttk.Entry(url_row, textvariable=self._dialog_vars["image_url"]).grid(row=0, column=0, sticky="we", padx=(0, 12))
+        ttk.Entry(url_row, textvariable=self._dialog_vars["image_url"], width=52).grid(
+            row=0, column=0, sticky="we", padx=(0, 12)
+        )
         ttk.Button(url_row, text="Preview", command=self._update_image_preview, width=10).grid(row=0, column=1)
 
         preview_container = tk.Frame(parent, bg=self.card_bg)
@@ -238,7 +300,7 @@ class AddItemView(tk.Frame):
         button_row.grid(row=15, column=0, sticky="e", pady=(10, 0))
 
         ttk.Button(button_row, text="Save", style="Primary.TButton", command=self._handle_save).pack(side="left")
-        ttk.Button(button_row, text="Cancel", style="Secondary.TButton", command=self._close_dialog).pack(
+        ttk.Button(button_row, text="Cancel", style="Secondary.TButton", command=self._handle_cancel).pack(
             side="left", padx=(12, 0)
         )
 
@@ -250,8 +312,8 @@ class AddItemView(tk.Frame):
     def _populate_form(self, item: dict[str, Any]) -> None:
         self._dialog_vars["category"].set(item.get("category", ""))
         self._dialog_vars["name"].set(item.get("name", ""))
-        self._dialog_vars["date_added"].set(item.get("date_added", ""))
-        self._dialog_vars["end_date"].set(item.get("end_date", ""))
+        self._dialog_vars["date_added"].set(self._format_date_for_display(item.get("date_added")))
+        self._dialog_vars["end_date"].set(self._format_date_for_display(item.get("end_date")))
         self._dialog_vars["image_url"].set(item.get("image_url", ""))
         self._editing_item_status = item.get("status", "active")
         if self._description_text is not None:
@@ -272,8 +334,8 @@ class AddItemView(tk.Frame):
         name = self._dialog_vars["name"].get().strip()
         description = (self._description_text.get("1.0", "end").strip() if self._description_text else "")
         notes = self._notes_text.get("1.0", "end").strip() if self._notes_text else ""
-        date_added = self._dialog_vars["date_added"].get().strip()
-        end_date = self._dialog_vars["end_date"].get().strip()
+        date_added_display = self._dialog_vars["date_added"].get().strip()
+        end_date_display = self._dialog_vars["end_date"].get().strip()
         image_url = self._dialog_vars["image_url"].get().strip()
 
         if not category:
@@ -288,6 +350,27 @@ class AddItemView(tk.Frame):
             messagebox.showerror("Add Item", "Please provide a description for the item.", parent=self.winfo_toplevel())
             return
 
+        date_added_storage = self._convert_display_to_storage(date_added_display)
+        if not date_added_storage:
+            messagebox.showerror(
+                "Add Item",
+                "Please provide a valid Date Added in DD-MM-YYYY format.",
+                parent=self.winfo_toplevel(),
+            )
+            return
+
+        end_date_storage = ""
+        if end_date_display:
+            converted_end = self._convert_display_to_storage(end_date_display)
+            if converted_end is None:
+                messagebox.showerror(
+                    "Add Item",
+                    "Please provide a valid End Date in DD-MM-YYYY format.",
+                    parent=self.winfo_toplevel(),
+                )
+                return
+            end_date_storage = converted_end
+
         status = self._editing_item_status or "active"
         if self._restore_on_save and status.lower() == "ended":
             status = "active"
@@ -298,8 +381,8 @@ class AddItemView(tk.Frame):
             "name": name,
             "description": description,
             "notes": notes,
-            "date_added": date_added,
-            "end_date": end_date,
+            "date_added": date_added_storage,
+            "end_date": end_date_storage,
             "image_url": image_url,
             "status": status,
         }
@@ -320,6 +403,17 @@ class AddItemView(tk.Frame):
         self._render_items_list()
         self._notify_items_changed()
         self._close_dialog()
+        if self._dialog_on_close:
+            callback = self._dialog_on_close
+            self._dialog_on_close = None
+            callback(False)
+
+    def _handle_cancel(self) -> None:
+        self._close_dialog()
+        if self._dialog_on_close:
+            callback = self._dialog_on_close
+            self._dialog_on_close = None
+            callback(True)
 
     def _update_image_preview(self) -> None:
         if not self._image_preview_label:
@@ -424,23 +518,14 @@ class AddItemView(tk.Frame):
             )
             name_label.pack(anchor="w")
 
+            date_added_display = self._format_date_for_display(item.get("date_added"))
             tk.Label(
                 card,
-                text=f"{item.get('category', 'No category')} • {item.get('date_added') or 'No date'}",
+                text=f"{item.get('category', 'No category')} • {date_added_display or 'No date'}",
                 font=("Segoe UI", 11),
                 bg=self.card_bg,
                 fg=self.text_color,
             ).pack(anchor="w")
-
-            days_left = self._days_left_for_item(item)
-            if days_left is not None:
-                tk.Label(
-                    card,
-                    text=f"Days left: {max(days_left, 0)}",
-                    font=("Segoe UI", 10),
-                    bg=self.card_bg,
-                    fg="#1E88E5" if days_left > 0 else "#C62828",
-                ).pack(anchor="w")
 
             description = item.get("description", "")
             if description:
@@ -466,11 +551,11 @@ class AddItemView(tk.Frame):
                     justify="left",
                 ).pack(anchor="w", pady=(0, 4))
 
-            end_date = item.get("end_date")
-            if end_date:
+            end_date_display = self._format_date_for_display(item.get("end_date"))
+            if end_date_display:
                 tk.Label(
                     card,
-                    text=f"End Date: {end_date}",
+                    text=f"End Date: {end_date_display}",
                     font=("Segoe UI", 10),
                     bg=self.card_bg,
                     fg="#6F7F92",
@@ -590,9 +675,14 @@ class AddItemView(tk.Frame):
     # --------------------------------------------------------------------------------------------
     # External operations
     # --------------------------------------------------------------------------------------------
-    def edit_item(self, item_id: str, restore_on_save: bool = False) -> None:
+    def edit_item(
+        self,
+        item_id: str,
+        restore_on_save: bool = False,
+        on_close: Callable[[bool], None] | None = None,
+    ) -> None:
         self._restore_on_save = restore_on_save
-        self.open_add_item_dialog(item_id=item_id)
+        self.open_add_item_dialog(item_id=item_id, on_close=on_close)
 
     def delete_item(self, item_id: str) -> None:
         index = next((i for i, item in enumerate(self.items) if item.get("id") == item_id), None)
@@ -625,75 +715,86 @@ class AddItemView(tk.Frame):
         self._render_items_list()
         self._notify_items_changed()
 
-    def open_item_details(self, item_id: str) -> None:
+    def open_item_details(self, item_id: str, on_back: Callable[[], None] | None = None) -> None:
         item = self._find_item(item_id)
         if not item:
             return
 
-        detail = tk.Toplevel(self)
-        detail.title(item.get("name") or "Item details")
-        detail.configure(bg=self.primary_bg)
-        detail.transient(self.winfo_toplevel())
-        detail.grab_set()
-        detail.resizable(False, False)
+        self._close_detail_overlay()
 
-        frame = tk.Frame(detail, bg=self.primary_bg, padx=24, pady=24)
-        frame.pack(fill="both", expand=True)
+        self._detail_callback = on_back
+        self._detail_overlay = tk.Frame(self, bg=self.primary_bg)
+        self._detail_overlay.place(relx=0, rely=0, relwidth=1, relheight=1)
+        self._detail_overlay.lift()
 
-        tk.Label(
-            frame,
+        wrapper = tk.Frame(self._detail_overlay, bg=self.primary_bg)
+        wrapper.pack(fill="both", expand=True, padx=40, pady=40)
+
+        card = tk.Frame(wrapper, bg=self.card_bg, padx=32, pady=32)
+        card.pack(fill="both", expand=True)
+
+        title = tk.Label(
+            card,
             text=item.get("name") or "Item",
-            font=("Segoe UI Semibold", 18),
-            bg=self.primary_bg,
+            font=("Segoe UI Semibold", 20),
+            bg=self.card_bg,
             fg=self.text_color,
-        ).pack(anchor="w")
+        )
+        title.pack(anchor="w")
 
         subtitle_parts = []
         if item.get("category"):
             subtitle_parts.append(f"Category: {item['category']}")
         if item.get("date_added"):
-            subtitle_parts.append(f"Added: {item['date_added']}")
+            subtitle_parts.append(f"Added: {self._format_date_for_display(item.get('date_added'))}")
         if item.get("end_date"):
-            subtitle_parts.append(f"Ends: {item['end_date']}")
+            subtitle_parts.append(f"Ends: {self._format_date_for_display(item.get('end_date'))}")
         if subtitle_parts:
             tk.Label(
-                frame,
+                card,
                 text=" • ".join(subtitle_parts),
                 font=("Segoe UI", 11),
-                bg=self.primary_bg,
+                bg=self.card_bg,
                 fg="#41566F",
-            ).pack(anchor="w", pady=(6, 12))
+            ).pack(anchor="w", pady=(6, 16))
 
         if item.get("image_url"):
-            image_frame = tk.Frame(frame, bg=self.primary_bg)
-            image_frame.pack(anchor="w", pady=(0, 12))
-            image_label = tk.Label(image_frame, bg=self.primary_bg)
+            image_frame = tk.Frame(card, bg=self.card_bg)
+            image_frame.pack(anchor="w", pady=(0, 16))
+            image_label = tk.Label(image_frame, bg=self.card_bg)
             image_label.pack()
-            self._load_image_into_label(item.get("image_url"), image_label, max_size=(400, 300))
+            self._load_image_into_label(item.get("image_url"), image_label, max_size=(420, 320))
 
         if item.get("description"):
             tk.Label(
-                frame,
+                card,
                 text=item["description"],
                 font=("Segoe UI", 11),
-                bg=self.primary_bg,
+                bg=self.card_bg,
                 fg="#28374A",
-                wraplength=520,
+                wraplength=620,
                 justify="left",
-            ).pack(anchor="w", pady=(0, 10))
+            ).pack(anchor="w", pady=(0, 12))
 
         if item.get("notes"):
             tk.Label(
-                frame,
+                card,
                 text=f"Notes: {item['notes']}",
                 font=("Segoe UI", 10),
-                bg=self.primary_bg,
+                bg=self.card_bg,
                 fg="#5A6D82",
-                wraplength=520,
+                wraplength=620,
                 justify="left",
             ).pack(anchor="w")
 
-        ttk.Button(frame, text="Close", command=detail.destroy).pack(anchor="e", pady=(18, 0))
+        button_row = tk.Frame(card, bg=self.card_bg)
+        button_row.pack(anchor="e", pady=(24, 0))
+        ttk.Button(
+            button_row,
+            text="Back",
+            style="Secondary.TButton",
+            command=lambda: self._close_detail_overlay(notify=True),
+        ).pack(side="right")
 
     def _find_item(self, item_id: str | None) -> dict[str, Any] | None:
         if not item_id:
@@ -759,15 +860,9 @@ class AddItemView(tk.Frame):
 
         today = date.today()
         current_value = self._dialog_vars[target_field].get().strip()
-        year = today.year
-        month = today.month
-        try:
-            if current_value:
-                parsed = date.fromisoformat(current_value)
-                year = parsed.year
-                month = parsed.month
-        except ValueError:
-            pass
+        parsed_value = self._parse_date_string(current_value)
+        year = parsed_value.year if parsed_value else today.year
+        month = parsed_value.month if parsed_value else today.month
 
         self._date_picker_state = {"field": target_field, "year": year, "month": month}
 
@@ -875,7 +970,7 @@ class AddItemView(tk.Frame):
             return
         field = self._date_picker_state.get("field")
         if field and field in self._dialog_vars:
-            self._dialog_vars[field].set(selected.isoformat())
+            self._dialog_vars[field].set(self._date_to_display(selected))
         self._close_date_picker()
 
     def _close_date_picker(self) -> None:
@@ -919,5 +1014,20 @@ class AddItemView(tk.Frame):
             self._dialog_canvas.yview_scroll(-1, "units")
         elif event.num == 5 or (hasattr(event, "delta") and event.delta < 0):
             self._dialog_canvas.yview_scroll(1, "units")
+
+    def _close_detail_overlay(self, notify: bool = False) -> None:
+        if self._detail_overlay and self._detail_overlay.winfo_exists():
+            self._detail_overlay.place_forget()
+            self._detail_overlay.destroy()
+        self._detail_overlay = None
+        if notify and self._detail_callback:
+            callback = self._detail_callback
+            self._detail_callback = None
+            callback()
+        elif not notify:
+            self._detail_callback = None
+
+    def close_item_details(self) -> None:
+        self._close_detail_overlay()
 
 

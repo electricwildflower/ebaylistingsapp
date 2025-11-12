@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os
 import urllib.request
-from datetime import date
+from datetime import date, datetime
 from io import BytesIO
 from typing import Any, Callable
 
@@ -17,6 +17,18 @@ try:
 except ImportError:  # pragma: no cover - handled at runtime
     Image = None  # type: ignore
     ImageTk = None  # type: ignore
+
+
+def _format_date_display(value: str | None) -> str:
+    if not value:
+        return ""
+    value = value.strip()
+    for fmt in ("%Y-%m-%d", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(value, fmt).strftime("%d-%m-%Y")
+        except ValueError:
+            continue
+    return value
 
 
 class AddCategoryView(tk.Frame):
@@ -633,9 +645,9 @@ class AddCategoryView(tk.Frame):
 
             subtitle_parts: list[str] = []
             if item.get("date_added"):
-                subtitle_parts.append(f"Added: {item['date_added']}")
+                subtitle_parts.append(f"Added: {_format_date_display(item.get('date_added'))}")
             if item.get("end_date"):
-                subtitle_parts.append(f"End: {item['end_date']}")
+                subtitle_parts.append(f"End: {_format_date_display(item.get('end_date'))}")
             if subtitle_parts:
                 tk.Label(
                     info,

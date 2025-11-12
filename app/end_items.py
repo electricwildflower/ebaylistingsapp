@@ -6,6 +6,19 @@ from typing import Any, Callable, Iterable
 
 import tkinter as tk
 from tkinter import messagebox, ttk
+from datetime import datetime, date
+
+
+def _format_date_display(value: str | None) -> str:
+    if not value:
+        return ""
+    value = value.strip()
+    for fmt in ("%Y-%m-%d", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(value, fmt).strftime("%d-%m-%Y")
+        except ValueError:
+            continue
+    return value
 
 
 class EndItemsView(tk.Frame):
@@ -135,6 +148,8 @@ class EndItemsView(tk.Frame):
                 or search_text in (item.get("description") or "").lower()
                 or search_text in (item.get("notes") or "").lower()
                 or search_text in (item.get("category") or "").lower()
+                or search_text in _format_date_display(item.get("date_added")).lower()
+                or search_text in _format_date_display(item.get("end_date")).lower()
             ]
         else:
             filtered = list(base_items)
@@ -203,9 +218,9 @@ class EndItemsView(tk.Frame):
             if item.get("category"):
                 subtitle_parts.append(f"Category: {item['category']}")
             if item.get("date_added"):
-                subtitle_parts.append(f"Added: {item['date_added']}")
+                subtitle_parts.append(f"Added: {_format_date_display(item.get('date_added'))}")
             if item.get("end_date"):
-                subtitle_parts.append(f"Ended: {item['end_date']}")
+                subtitle_parts.append(f"Ended: {_format_date_display(item.get('end_date'))}")
             if subtitle_parts:
                 tk.Label(
                     info,
