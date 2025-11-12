@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, date
 from typing import Any, Callable, Iterable
 
 import tkinter as tk
@@ -178,6 +178,16 @@ class ItemsAddedView(tk.Frame):
         self._filtered = filtered
         self._render_items()
 
+    def _days_left(self, item: dict[str, Any]) -> int | None:
+        end = item.get("end_date")
+        if not end:
+            return None
+        try:
+            end_date = date.fromisoformat(end)
+        except ValueError:
+            return None
+        return (end_date - date.today()).days
+
     # --------------------------------------------------------------------------------------------
     # Rendering
     # --------------------------------------------------------------------------------------------
@@ -235,6 +245,16 @@ class ItemsAddedView(tk.Frame):
                 bg=self.card_bg,
                 fg=self.text_color,
             ).pack(anchor="w")
+
+            days_left = self._days_left(item)
+            if days_left is not None:
+                tk.Label(
+                    info,
+                    text=f"Days left: {max(days_left, 0)}",
+                    font=("Segoe UI", 10),
+                    bg=self.card_bg,
+                    fg="#1E88E5" if days_left > 0 else "#C62828",
+                ).pack(anchor="w")
 
             subtitle_parts: list[str] = []
             if item.get("category"):
@@ -348,6 +368,7 @@ class ItemsAddedView(tk.Frame):
         )
         if answer:
             self._delete_callback(item_id)
+            self._apply_filters()
 
     def _handle_open(self, item_id: str | None) -> None:
         if item_id and self._open_callback:
@@ -364,6 +385,7 @@ class ItemsAddedView(tk.Frame):
         )
         if answer:
             self._end_callback(item_id)
+            self._apply_filters()
 
     def _load_image(self, url: str) -> tk.PhotoImage | None:
         if not url:

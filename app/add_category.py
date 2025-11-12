@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import urllib.request
+from datetime import date
 from io import BytesIO
 from typing import Any, Callable
 
@@ -431,6 +432,7 @@ class AddCategoryView(tk.Frame):
         self._dialog_items_container = tk.Frame(self._dialog, bg=self.card_bg)
         self._dialog_items_container.pack(fill="both", expand=True)
         self._dialog_images.clear()
+        self._dialog_image_cache.clear()
         self._current_dialog_category = category.get("name")
         self._render_dialog_items()
 
@@ -594,6 +596,16 @@ class AddCategoryView(tk.Frame):
                 fg=self.text_color,
             ).pack(anchor="w")
 
+            days_left = self._days_left(item)
+            if days_left is not None:
+                tk.Label(
+                    info,
+                    text=f"Days left: {max(days_left, 0)}",
+                    font=("Segoe UI", 10),
+                    bg=self.card_bg,
+                    fg="#1E88E5" if days_left > 0 else "#C62828",
+                ).pack(anchor="w")
+
             subtitle_parts: list[str] = []
             if item.get("date_added"):
                 subtitle_parts.append(f"Added: {item['date_added']}")
@@ -665,6 +677,16 @@ class AddCategoryView(tk.Frame):
             ]
         except Exception:  # pragma: no cover - defensive
             return []
+
+    def _days_left(self, item: dict[str, Any]) -> int | None:
+        end = item.get("end_date")
+        if not end:
+            return None
+        try:
+            end_date = date.fromisoformat(end)
+        except ValueError:
+            return None
+        return (end_date - date.today()).days
 
     def _handle_item_edit(self, item_id: str | None) -> None:
         if item_id and self._edit_item_callback:

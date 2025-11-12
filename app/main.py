@@ -1,6 +1,7 @@
 import json
 import os
 import tkinter as tk
+from datetime import date
 from typing import Any
 from tkinter import filedialog, messagebox, ttk
 
@@ -220,7 +221,7 @@ class EbayListingApp:
         )
         items_menu.add_command(label="Add a New Item", command=self.show_add_item)
         items_menu.add_command(label="Items Added", command=self.show_items_added)
-        items_menu.add_command(label="End an Item", command=self.show_end_item)
+        items_menu.add_command(label="Items Ended", command=self.show_end_item)
         items_button.configure(menu=items_menu)
         items_button.pack(side="left", padx=4)
 
@@ -327,26 +328,14 @@ class EbayListingApp:
 
         self._build_main_hero_title()
 
-        hero_subtitle = tk.Label(
+        heading = tk.Label(
             self.main_frame,
-            text="Streamline your listing workflow with a clean and modern interface.",
-            font=("Segoe UI", 13),
+            text="eBay Listings Manager",
+            font=("Segoe UI Semibold", 24),
             bg=self.primary_bg,
-            fg="#305170",
-        )
-        hero_subtitle.pack(pady=(0, 40))
-
-        card = tk.Frame(self.main_frame, bg=self.card_bg, padx=40, pady=40)
-        card.pack(pady=10, ipadx=10, ipady=10)
-
-        card_label = tk.Label(
-            card,
-            text="Welcome to the refreshed experience!",
-            font=("Segoe UI Semibold", 14),
-            bg=self.card_bg,
             fg=self.text_color,
         )
-        card_label.pack()
+        heading.pack(pady=(20, 10))
 
         self.dashboard_container = tk.Frame(self.main_frame, bg=self.primary_bg)
         self.dashboard_container.pack(fill="both", expand=True, padx=40, pady=(30, 40))
@@ -774,7 +763,8 @@ class EbayListingApp:
             placeholder.pack(anchor="w")
             return
 
-        for item in reversed(self.items[-10:]):
+        recent_items = list(reversed(self.items[-10:]))
+        for item in recent_items:
             card = tk.Frame(
                 self.main_recent_container,
                 bg=self.card_bg,
@@ -783,32 +773,54 @@ class EbayListingApp:
                 padx=16,
                 pady=12,
             )
-            card.pack(fill="x", pady=(0, 12))
+            card.pack(fill="x", pady=(0, 10))
+
+            header = tk.Frame(card, bg=self.card_bg)
+            header.pack(fill="x")
 
             name = item.get("name") or item.get("description", "Item")
-            title = tk.Label(
-                card,
+            tk.Label(
+                header,
                 text=name,
                 font=("Segoe UI Semibold", 13),
                 bg=self.card_bg,
                 fg=self.text_color,
-            )
-            title.pack(anchor="w")
+            ).pack(side="left")
 
-            subtitle_parts = []
+            status = (item.get("status") or "active").lower()
+            days_left = self._days_left(item)
+            if status == "ended":
+                tk.Label(
+                    header,
+                    text="Ended",
+                    font=("Segoe UI Semibold", 11),
+                    bg=self.card_bg,
+                    fg="#C62828",
+                ).pack(side="right")
+            elif days_left is not None:
+                tk.Label(
+                    header,
+                    text=f"{max(days_left, 0)} day(s) left",
+                    font=("Segoe UI Semibold", 11),
+                    bg=self.card_bg,
+                    fg="#1E88E5" if days_left > 0 else "#C62828",
+                ).pack(side="right")
+
+            details = []
             if item.get("category"):
-                subtitle_parts.append(item["category"])
+                details.append(f"Category: {item['category']}")
             if item.get("date_added"):
-                subtitle_parts.append(f"Added {item['date_added']}")
-            subtitle = " • ".join(subtitle_parts)
-            if subtitle:
+                details.append(f"Added: {item['date_added']}")
+            if item.get("end_date"):
+                details.append(f"End: {item['end_date']}")
+            if details:
                 tk.Label(
                     card,
-                    text=subtitle,
+                    text=" • ".join(details),
                     font=("Segoe UI", 10),
                     bg=self.card_bg,
-                    fg="#1E3A5F",
-                ).pack(anchor="w")
+                    fg="#41566F",
+                ).pack(anchor="w", pady=(4, 4))
 
             notes = item.get("notes")
             if notes:
@@ -817,24 +829,20 @@ class EbayListingApp:
                     text=f"Notes: {notes}",
                     font=("Segoe UI", 10),
                     bg=self.card_bg,
-                    fg="#41566F",
-                    wraplength=520,
+                    fg="#60738A",
+                    wraplength=420,
                     justify="left",
-                ).pack(anchor="w", pady=(4, 4))
-
-            dates = []
-            if item.get("date_added"):
-                dates.append(f"Added: {item['date_added']}")
-            if item.get("end_date"):
-                dates.append(f"End: {item['end_date']}")
-            if dates:
-                tk.Label(
-                    card,
-                    text=" • ".join(dates),
-                    font=("Segoe UI", 10),
-                    bg=self.card_bg,
-                    fg="#6F7F92",
                 ).pack(anchor="w")
+
+    def _days_left(self, item: dict[str, Any]) -> int | None:
+        end = item.get("end_date")
+        if not end:
+            return None
+        try:
+            end_date = date.fromisoformat(end)
+        except ValueError:
+            return None
+        return (end_date - date.today()).days
 
     def _update_items_display(self, items: list[dict[str, Any]]) -> None:
         self.items = items

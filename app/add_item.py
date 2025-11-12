@@ -315,6 +315,7 @@ class AddItemView(tk.Frame):
         self._editing_item_status = status
         self._restore_on_save = False
 
+        self._refresh_item_statuses()
         self._persist_items()
         self._render_items_list()
         self._notify_items_changed()
@@ -380,6 +381,10 @@ class AddItemView(tk.Frame):
     # Rendering
     # --------------------------------------------------------------------------------------------
     def _render_items_list(self) -> None:
+        status_changed = self._refresh_item_statuses()
+        if status_changed:
+            self._persist_items()
+
         for child in self.items_list_container.winfo_children():
             child.destroy()
 
@@ -419,14 +424,23 @@ class AddItemView(tk.Frame):
             )
             name_label.pack(anchor="w")
 
-            title = tk.Label(
+            tk.Label(
                 card,
                 text=f"{item.get('category', 'No category')} • {item.get('date_added') or 'No date'}",
                 font=("Segoe UI", 11),
                 bg=self.card_bg,
                 fg=self.text_color,
-            )
-            title.pack(anchor="w")
+            ).pack(anchor="w")
+
+            days_left = self._days_left_for_item(item)
+            if days_left is not None:
+                tk.Label(
+                    card,
+                    text=f"Days left: {max(days_left, 0)}",
+                    font=("Segoe UI", 10),
+                    bg=self.card_bg,
+                    fg="#1E88E5" if days_left > 0 else "#C62828",
+                ).pack(anchor="w")
 
             description = item.get("description", "")
             if description:
@@ -463,6 +477,8 @@ class AddItemView(tk.Frame):
                 ).pack(anchor="w")
 
         self._sync_scroll_region(None)
+        if status_changed:
+            self._notify_items_changed()
 
     # --------------------------------------------------------------------------------------------
     # Data helpers
@@ -474,6 +490,8 @@ class AddItemView(tk.Frame):
         self._notify_items_changed()
 
     def get_items(self) -> list[dict[str, Any]]:
+        if self._refresh_item_statuses():
+            self._persist_items()
         return [dict(item) for item in self.items]
 
     def _persist_items(self) -> None:
@@ -527,6 +545,31 @@ class AddItemView(tk.Frame):
                 normalized["status"] = str(normalized.get("status", "active")).strip() or "active"
                 parsed.append(normalized)
         self.items = parsed
+        if self._refresh_item_statuses():
+            self._persist_items()
+
+    def _days_left_for_item(self, item: dict[str, Any], today: date | None = None) -> int | None:
+        end = item.get("end_date")
+        if not end:
+            return None
+        try:
+            end_date = date.fromisoformat(end)
+        except ValueError:
+            return None
+        if today is None:
+            today = date.today()
+        return (end_date - today).days
+
+    def _refresh_item_statuses(self) -> bool:
+        changed = False
+        today = date.today()
+        for item in self.items:
+            status = (item.get("status") or "active").lower()
+            days_left = self._days_left_for_item(item, today)
+            if days_left is not None and days_left <= 0 and status != "ended":
+                item["status"] = "ended"
+                changed = True
+        return changed
 
     def _data_file_path(self) -> str | None:
         if not self.storage_path:
@@ -540,6 +583,8 @@ class AddItemView(tk.Frame):
 
     def _notify_items_changed(self) -> None:
         if self._items_changed_callback:
+            if self._refresh_item_statuses():
+                self._persist_items()
             self._items_changed_callback(self.get_items())
 
     # --------------------------------------------------------------------------------------------
