@@ -20,7 +20,7 @@ class EndItemsView(tk.Frame):
         card_bg: str,
         items_provider: Iterable[dict[str, Any]] | None = None,
         open_callback: Callable[[str], None] | None = None,
-        edit_callback: Callable[[str], None] | None = None,
+        edit_callback: Callable[[str, bool], None] | None = None,
         restore_callback: Callable[[str], None] | None = None,
         delete_callback: Callable[[str], None] | None = None,
         **kwargs: Any,
@@ -302,7 +302,7 @@ class EndItemsView(tk.Frame):
 
     def _handle_edit(self, item_id: str | None) -> None:
         if item_id and self._edit_callback:
-            self._edit_callback(item_id)
+            self._edit_callback(item_id, True)
 
     def _handle_restore(self, item_id: str | None, name: str | None) -> None:
         if not item_id or not self._restore_callback:
@@ -315,6 +315,7 @@ class EndItemsView(tk.Frame):
         )
         if answer:
             self._restore_callback(item_id)
+            self._apply_filters()
 
     def _handle_delete(self, item_id: str | None, name: str | None) -> None:
         if not item_id or not self._delete_callback:
@@ -327,6 +328,7 @@ class EndItemsView(tk.Frame):
         )
         if answer:
             self._delete_callback(item_id)
+            self._apply_filters()
 
     def _load_image(self, url: str) -> tk.PhotoImage | None:
         if not url:

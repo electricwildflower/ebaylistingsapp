@@ -59,6 +59,8 @@ class AddItemView(tk.Frame):
         self._dialog_mousewheel_bound = False
         self._dialog_canvas_window_id: int | None = None
         self._editing_item_id: str | None = None
+        self._editing_item_status: str = "active"
+        self._restore_on_save: bool = False
         self._editing_item_status: str | None = None
 
         self._load_items()
@@ -117,8 +119,10 @@ class AddItemView(tk.Frame):
             return
 
         self._editing_item_id = item_id
+        if item_id is None:
+            self._restore_on_save = False
         item_data = self._find_item(item_id) if item_id else None
-        self._editing_item_status = item_data.get("status") if item_data else "active"
+        self._editing_item_status = item_data.get("status", "active") if item_data else "active"
 
         if self._dialog_backdrop and self._dialog_backdrop.winfo_exists():
             self._close_dialog()
@@ -251,6 +255,7 @@ class AddItemView(tk.Frame):
         self._dialog_vars["end_date"].set(item.get("end_date", ""))
         self._dialog_vars["image_url"].set(item.get("image_url", ""))
         self._editing_item_status = item.get("status", "active")
+        self._editing_item_status = item.get("status", "active")
         if self._description_text is not None:
             self._description_text.delete("1.0", "end")
             self._description_text.insert("1.0", item.get("description", ""))
@@ -286,6 +291,9 @@ class AddItemView(tk.Frame):
             return
 
         status = self._editing_item_status or "active"
+        if self._restore_on_save and status.lower() == "ended":
+            status = "active"
+
         item = {
             "id": self._editing_item_id or uuid4().hex,
             "category": category,
@@ -305,6 +313,9 @@ class AddItemView(tk.Frame):
                     break
         else:
             self.items.append(item)
+
+        self._editing_item_status = status
+        self._restore_on_save = False
 
         self._persist_items()
         self._render_items_list()
@@ -363,7 +374,8 @@ class AddItemView(tk.Frame):
         self._dialog_canvas_window_id = None
         self._dialog_mousewheel_bound = False
         self._editing_item_id = None
-        self._editing_item_status = None
+        self._editing_item_status = "active"
+        self._restore_on_save = False
         self._close_date_picker()
 
     # --------------------------------------------------------------------------------------------
@@ -535,7 +547,8 @@ class AddItemView(tk.Frame):
     # --------------------------------------------------------------------------------------------
     # External operations
     # --------------------------------------------------------------------------------------------
-    def edit_item(self, item_id: str) -> None:
+    def edit_item(self, item_id: str, restore_on_save: bool = False) -> None:
+        self._restore_on_save = restore_on_save
         self.open_add_item_dialog(item_id=item_id)
 
     def delete_item(self, item_id: str) -> None:

@@ -30,9 +30,10 @@ class AddCategoryView(tk.Frame):
         storage_path: str | None = None,
         on_categories_changed: Callable[[list[dict[str, str]]], None] | None = None,
         items_provider: Callable[[], list[dict[str, Any]]] | None = None,
-        edit_item_callback: Callable[[str], None] | None = None,
+        edit_item_callback: Callable[[str, bool], None] | None = None,
         delete_item_callback: Callable[[str], None] | None = None,
         open_item_callback: Callable[[str], None] | None = None,
+        end_item_callback: Callable[[str], None] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(master, bg=primary_bg, **kwargs)
@@ -53,6 +54,7 @@ class AddCategoryView(tk.Frame):
         self._edit_item_callback = edit_item_callback
         self._delete_item_callback = delete_item_callback
         self._open_item_callback = open_item_callback
+        self._end_item_callback = end_item_callback
 
         self._dialog_items_container: tk.Frame | None = None
         self._dialog_images: list[tk.PhotoImage] = []
@@ -273,6 +275,7 @@ class AddCategoryView(tk.Frame):
         self._dialog_description = None
         self._dialog_items_container = None
         self._dialog_images.clear()
+        self._dialog_image_cache.clear()
         self._current_dialog_category = None
 
     def _save_category(self) -> None:
@@ -636,6 +639,13 @@ class AddCategoryView(tk.Frame):
 
             ttk.Button(
                 actions,
+                text="End Item",
+                style="Secondary.TButton",
+                command=lambda item_id=item.get("id"), name=item.get("name"): self._handle_item_end(item_id, name),
+            ).pack(side="left", padx=(0, 8))
+
+            ttk.Button(
+                actions,
                 text="Delete",
                 style="Secondary.TButton",
                 command=lambda item_id=item.get("id"), name=item.get("name"): self._handle_item_delete(
@@ -659,7 +669,7 @@ class AddCategoryView(tk.Frame):
     def _handle_item_edit(self, item_id: str | None) -> None:
         if item_id and self._edit_item_callback:
             self._close_dialog()
-            self._edit_item_callback(item_id)
+            self._edit_item_callback(item_id, False)
 
     def _handle_item_delete(self, item_id: str | None, name: str | None) -> None:
         if not item_id or not self._delete_item_callback:
@@ -677,6 +687,20 @@ class AddCategoryView(tk.Frame):
     def _handle_item_open(self, item_id: str | None) -> None:
         if item_id and self._open_item_callback:
             self._open_item_callback(item_id)
+
+    def _handle_item_end(self, item_id: str | None, name: str | None) -> None:
+        if not item_id or not self._end_item_callback:
+            return
+
+        answer = messagebox.askyesno(
+            "End Item",
+            f"Mark \"{name or 'this item'}\" as ended?",
+            parent=self.winfo_toplevel(),
+            icon="question",
+        )
+        if answer:
+            self._end_item_callback(item_id)
+            self._render_dialog_items()
 
     def _load_image(self, url: str) -> tk.PhotoImage | None:
         if not url:

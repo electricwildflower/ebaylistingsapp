@@ -291,6 +291,7 @@ class EbayListingApp:
             edit_item_callback=self._edit_item,
             delete_item_callback=self._delete_item,
             open_item_callback=self._open_item_details,
+            end_item_callback=self._end_item,
         )
         self.add_item_frame = AddItemView(
             self.content_container,
@@ -851,10 +852,10 @@ class EbayListingApp:
         if hasattr(self, "add_category_frame"):
             self.add_category_frame.refresh_open_category_items()
 
-    def _edit_item(self, item_id: str) -> None:
+    def _edit_item(self, item_id: str, restore: bool = False) -> None:
         self._show_top_bar()
         self._show_frame(self.add_item_frame)
-        self.add_item_frame.edit_item(item_id)
+        self.add_item_frame.edit_item(item_id, restore_on_save=restore)
 
     def _delete_item(self, item_id: str) -> None:
         self.add_item_frame.delete_item(item_id)

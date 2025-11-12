@@ -20,7 +20,7 @@ class ItemsAddedView(tk.Frame):
         text_color: str,
         card_bg: str,
         items_provider: Iterable[dict[str, Any]] | None = None,
-        edit_callback: Callable[[str], None] | None = None,
+        edit_callback: Callable[[str, bool], None] | None = None,
         delete_callback: Callable[[str], None] | None = None,
         open_callback: Callable[[str], None] | None = None,
         end_callback: Callable[[str], None] | None = None,
@@ -335,7 +335,7 @@ class ItemsAddedView(tk.Frame):
     # --------------------------------------------------------------------------------------------
     def _handle_edit(self, item_id: str | None) -> None:
         if item_id and self._edit_callback:
-            self._edit_callback(item_id)
+            self._edit_callback(item_id, False)
 
     def _handle_delete(self, item_id: str | None, name: str | None) -> None:
         if not item_id or not self._delete_callback:
