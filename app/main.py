@@ -768,7 +768,7 @@ class EbayListingApp:
         self._set_clear_search_enabled(False)
 
         self.global_search_results = tk.Frame(self.global_search_wrapper, bg=self.primary_bg)
-        self.global_search_results.pack(fill="both", expand=True, pady=(12, 0))
+        self.global_search_results.pack(fill="x", expand=False, pady=(12, 0))
 
         self.global_search_var.trace_add("write", self._handle_global_search_update)
 
@@ -1032,10 +1032,14 @@ class EbayListingApp:
         if active and not current:
             if self.dashboard_container.winfo_ismapped():
                 self.dashboard_container.pack_forget()
+            if hasattr(self, "global_search_results"):
+                self.global_search_results.pack_configure(fill="both", expand=True)
             self._search_mode = True
         elif not active and current:
             if not self.dashboard_container.winfo_ismapped():
                 self.dashboard_container.pack(fill="both", expand=True, padx=40, pady=(12, 40))
+            if hasattr(self, "global_search_results"):
+                self.global_search_results.pack_configure(fill="x", expand=False)
             self._search_mode = False
 
     def _set_clear_search_enabled(self, enabled: bool) -> None:
