@@ -47,6 +47,8 @@ class AddCategoryView(tk.Frame):
         delete_item_callback: Callable[[str], None] | None = None,
         open_item_callback: Callable[[str], None] | None = None,
         end_item_callback: Callable[[str], None] | None = None,
+        add_item_callback: Callable[[str], None] | None = None,
+        rename_category_callback: Callable[[str, str], None] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(master, bg=primary_bg, **kwargs)
@@ -68,6 +70,8 @@ class AddCategoryView(tk.Frame):
         self._delete_item_callback = delete_item_callback
         self._open_item_callback = open_item_callback
         self._end_item_callback = end_item_callback
+        self._add_item_callback = add_item_callback
+        self._rename_category_callback = rename_category_callback
 
         self._dialog_items_container: tk.Frame | None = None
         self._dialog_images: list[tk.PhotoImage] = []
@@ -315,7 +319,12 @@ class AddCategoryView(tk.Frame):
             "days": days_value,
         }
         if self._dialog_mode == "edit" and self._editing_index is not None:
+            old_name = self.categories[self._editing_index].get("name", "")
             self.categories[self._editing_index] = category
+            if old_name and old_name != name and self._rename_category_callback:
+                self._rename_category_callback(old_name, name)
+                if self._current_dialog_category == old_name:
+                    self._current_dialog_category = name
         else:
             self.categories.append(category)
 
@@ -439,6 +448,15 @@ class AddCategoryView(tk.Frame):
             wraplength=560,
         )
         header.pack(pady=(0, 16))
+
+        action_row = tk.Frame(wrapper, bg=self.primary_bg)
+        action_row.pack(pady=(0, 16))
+        ttk.Button(
+            action_row,
+            text="Add Item",
+            style="Primary.TButton",
+            command=lambda name=category.get("name", ""): self._handle_add_item_to_category(name),
+        ).pack()
 
         search_wrapper = tk.Frame(wrapper, bg=self.primary_bg)
         search_wrapper.pack(fill="x", pady=(0, 8))
@@ -778,4 +796,10 @@ class AddCategoryView(tk.Frame):
             return photo
         except Exception:  # pragma: no cover - best effort fallback
             return None
+
+    def _handle_add_item_to_category(self, category_name: str) -> None:
+        if not category_name or not self._add_item_callback:
+            return
+        self._add_item_callback(category_name)
+        self._close_dialog()
 

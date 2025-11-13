@@ -9,6 +9,23 @@ from tkinter import messagebox, ttk
 from datetime import datetime, date
 
 
+PALETTE = ("#E53238", "#0064D2", "#F5AF02", "#86B817")
+
+
+def _create_colored_heading(parent: tk.Misc, text: str, bg: str, font: tuple[str, int] = ("Segoe UI Semibold", 26)) -> tk.Frame:
+    frame = tk.Frame(parent, bg=bg)
+    frame.pack(pady=(0, 24))
+    idx = 0
+    for char in text:
+        if char == " ":
+            tk.Label(frame, text=" ", font=font, bg=bg).pack(side="left")
+            continue
+        color = PALETTE[idx % len(PALETTE)]
+        tk.Label(frame, text=char, font=font, bg=bg, fg=color).pack(side="left")
+        idx += 1
+    return frame
+
+
 def _format_date_display(value: str | None) -> str:
     if not value:
         return ""
@@ -87,14 +104,7 @@ class EndItemsView(tk.Frame):
     def _build_title(self, parent: tk.Frame) -> None:
         title_wrapper = tk.Frame(parent, bg=self.primary_bg)
         title_wrapper.pack(pady=(0, 24))
-
-        tk.Label(
-            title_wrapper,
-            text="Ended Items",
-            font=("Segoe UI Semibold", 26),
-            bg=self.primary_bg,
-            fg=self.text_color,
-        ).pack()
+        _create_colored_heading(title_wrapper, "Items Ended", self.primary_bg)
 
     def _build_filters(self, parent: tk.Frame) -> None:
         filters = tk.Frame(parent, bg=self.primary_bg)

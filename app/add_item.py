@@ -22,6 +22,23 @@ except ImportError:  # pragma: no cover - handled by runtime dependency
     ImageTk = None  # type: ignore
 
 
+PALETTE = ("#E53238", "#0064D2", "#F5AF02", "#86B817")
+
+
+def _create_colored_heading(parent: tk.Misc, text: str, bg: str, font: tuple[str, int] = ("Segoe UI Semibold", 20)) -> tk.Frame:
+    frame = tk.Frame(parent, bg=bg)
+    frame.pack(pady=(0, 16))
+    idx = 0
+    for char in text:
+        if char == " ":
+            tk.Label(frame, text=" ", font=font, bg=bg).pack(side="left")
+            continue
+        color = PALETTE[idx % len(PALETTE)]
+        tk.Label(frame, text=char, font=font, bg=bg, fg=color).pack(side="left")
+        idx += 1
+    return frame
+
+
 class AddItemView(tk.Frame):
     """Visual layout and form handling for adding items."""
 
@@ -64,6 +81,7 @@ class AddItemView(tk.Frame):
         self._dialog_on_close: Callable[[bool], None] | None = None
         self._detail_overlay: tk.Frame | None = None
         self._detail_callback: Callable[[], None] | None = None
+        self._dialog_default_category: str | None = None
 
         self._load_items()
         self._build_layout()
@@ -133,30 +151,13 @@ class AddItemView(tk.Frame):
         self.canvas.bind("<Enter>", self._bind_mousewheel)
         self.canvas.bind("<Leave>", self._unbind_mousewheel)
 
-        header = tk.Label(
-            self._canvas_frame,
-            text="Add Items",
-            font=("Segoe UI Semibold", 22),
-            bg=self.primary_bg,
-            fg=self.text_color,
-        )
-        header.pack_forget()
-
-        add_button = ttk.Button(
-            self._canvas_frame,
-            text="Add a New Item",
-            style="Primary.TButton",
-            command=self.open_add_item_dialog,
-        )
-        add_button.pack_forget()
-
         self.items_list_container = tk.Frame(self._canvas_frame, bg=self.primary_bg)
-        self.items_list_container.pack_forget()
 
     def open_add_item_dialog(
         self,
         item_id: str | None = None,
         on_close: Callable[[bool], None] | None = None,
+        default_category: str | None = None,
     ) -> None:
         if not self.storage_path:
             messagebox.showerror(
@@ -179,6 +180,7 @@ class AddItemView(tk.Frame):
             self._close_dialog()
 
         self._dialog_on_close = on_close
+        self._dialog_default_category = default_category
 
         self._dialog_backdrop = tk.Frame(self, bg=self.primary_bg)
         self._dialog_backdrop.place(relx=0, rely=0, relwidth=1, relheight=1)
@@ -187,14 +189,8 @@ class AddItemView(tk.Frame):
         wrapper = tk.Frame(self._dialog_backdrop, bg=self.primary_bg)
         wrapper.pack(expand=True, pady=40, padx=20)
 
-        header = tk.Label(
-            wrapper,
-            text="Edit Item" if item_data else "Add a New Item",
-            font=("Segoe UI Semibold", 20),
-            bg=self.primary_bg,
-            fg=self.text_color,
-        )
-        header.pack(pady=(0, 16))
+        title = "Edit Item" if item_data else "Add a New Item"
+        _create_colored_heading(wrapper, title, self.primary_bg)
 
         self._dialog_canvas = tk.Canvas(
             wrapper,
@@ -308,6 +304,8 @@ class AddItemView(tk.Frame):
 
         if item_data:
             self._populate_form(item_data)
+        elif self._dialog_default_category and self._dialog_default_category in categories:
+            self._dialog_vars["category"].set(self._dialog_default_category)
 
     def _populate_form(self, item: dict[str, Any]) -> None:
         self._dialog_vars["category"].set(item.get("category", ""))
@@ -469,7 +467,7 @@ class AddItemView(tk.Frame):
         self._editing_item_id = None
         self._editing_item_status = "active"
         self._restore_on_save = False
-        self._close_date_picker()
+        self._dialog_default_category = None
 
     # --------------------------------------------------------------------------------------------
     # Rendering
@@ -1029,5 +1027,18 @@ class AddItemView(tk.Frame):
 
     def close_item_details(self) -> None:
         self._close_detail_overlay()
+
+    def rename_category(self, old_name: str, new_name: str) -> None:
+        if not old_name or not new_name or old_name == new_name:
+            return
+        changed = False
+        for item in self.items:
+            if item.get("category") == old_name:
+                item["category"] = new_name
+                changed = True
+        if changed:
+            self._persist_items()
+            self._render_items_list()
+            self._notify_items_changed()
 
 

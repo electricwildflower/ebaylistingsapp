@@ -277,6 +277,8 @@ class EbayListingApp:
             delete_item_callback=self._delete_item,
             open_item_callback=self._open_item_details,
             end_item_callback=self._end_item,
+            add_item_callback=self._add_item_for_category,
+            rename_category_callback=self._rename_category_items,
         )
 
         self.add_item_frame = AddItemView(
@@ -313,6 +315,7 @@ class EbayListingApp:
         )
 
         self.storage_config_frame = tk.Frame(self.content_container, bg=self.primary_bg)
+        self._build_storage_config_view()
 
         self._build_main_hero_title()
 
@@ -421,6 +424,7 @@ class EbayListingApp:
 
     def show_storage_config(self) -> None:
         self._show_top_bar()
+        self._update_storage_config_view()
         self._show_frame(self.storage_config_frame)
 
     def show_first_run(self) -> None:
@@ -978,6 +982,7 @@ class EbayListingApp:
         self.storage_path = config_dir
         self.add_item_frame.set_storage_path(config_dir)
         self.add_category_frame.set_storage_path(config_dir)
+        self._update_storage_config_view()
         self._save_config()
         self.show_main()
         return True
@@ -1106,6 +1111,101 @@ class EbayListingApp:
             self.show_storage_config()
         else:
             self.show_main()
+
+    def _add_item_for_category(self, category_name: str) -> None:
+        previous_frame = getattr(self, "_active_frame", None)
+        self._show_top_bar()
+        self._show_frame(self.add_item_frame)
+        self.add_item_frame.open_add_item_dialog(
+            on_close=lambda cancelled: self._return_to_frame(previous_frame),
+            default_category=category_name,
+        )
+
+    def _rename_category_items(self, old_name: str, new_name: str) -> None:
+        self.add_item_frame.rename_category(old_name, new_name)
+
+    def _build_storage_config_view(self) -> None:
+        frame = self.storage_config_frame
+        frame.configure(bg=self.primary_bg)
+
+        container = tk.Frame(frame, bg=self.primary_bg)
+        container.pack(fill="both", expand=True, padx=40, pady=60)
+
+        self._create_colored_heading(container, "Storage Configuration")
+
+        description = tk.Label(
+            container,
+            text=(
+                "Choose where to store your configuration files. "
+                "Selecting a shared folder lets multiple installations share data."
+            ),
+            font=("Segoe UI", 11),
+            bg=self.primary_bg,
+            fg="#41566F",
+            wraplength=620,
+            justify="left",
+        )
+        description.pack(anchor="w", pady=(16, 20))
+
+        info_row = tk.Frame(container, bg=self.primary_bg)
+        info_row.pack(fill="x", pady=(0, 24))
+
+        tk.Label(
+            info_row,
+            text="Current location:",
+            font=("Segoe UI Semibold", 11),
+            bg=self.primary_bg,
+            fg=self.text_color,
+        ).pack(anchor="w")
+
+        self.storage_info_var = tk.StringVar()
+        tk.Label(
+            info_row,
+            textvariable=self.storage_info_var,
+            font=("Segoe UI", 11),
+            bg=self.primary_bg,
+            fg="#1E3A5F",
+            wraplength=640,
+            justify="left",
+        ).pack(anchor="w", pady=(4, 0))
+
+        ttk.Button(
+            container,
+            text="Choose Folder",
+            style="Primary.TButton",
+            command=self._select_storage_path,
+        ).pack(anchor="w")
+
+        self._update_storage_config_view()
+
+    def _update_storage_config_view(self) -> None:
+        if not hasattr(self, "storage_info_var"):
+            return
+        if self.storage_path:
+            self.storage_info_var.set(self.storage_path)
+        else:
+            self.storage_info_var.set("No storage location selected yet.")
+
+    def _create_colored_heading(
+        self,
+        parent: tk.Misc,
+        text: str,
+        *,
+        font: tuple[str, int] = ("Segoe UI Semibold", 20),
+        pady: tuple[int, int] = (0, 16),
+    ) -> tk.Frame:
+        container = tk.Frame(parent, bg=self.primary_bg)
+        container.pack(anchor="w", pady=pady)
+        palette = ("#E53238", "#0064D2", "#F5AF02", "#86B817")
+        idx = 0
+        for char in text:
+            if char == " ":
+                tk.Label(container, text=" ", font=font, bg=self.primary_bg).pack(side="left")
+                continue
+            color = palette[idx % len(palette)]
+            tk.Label(container, text=char, font=font, bg=self.primary_bg, fg=color).pack(side="left")
+            idx += 1
+        return container
 
 
 def main() -> None:
