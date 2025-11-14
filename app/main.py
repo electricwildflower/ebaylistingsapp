@@ -147,26 +147,10 @@ class EbayListingApp:
         nav_container = tk.Frame(row, bg="#FFFFFF")
         nav_container.pack(side="left", padx=(16, 8), pady=4)
 
-        def _nav_menubutton(label: str) -> tk.Menubutton:
-            btn = tk.Menubutton(
-                nav_container,
-                text=label,
-                bg="#FFFFFF",
-                fg=self.text_color,
-                font=("Segoe UI Semibold", 11),
-                padx=12,
-                pady=6,
-                relief="flat",
-                borderwidth=0,
-                highlightthickness=0,
-                cursor="hand2",
-            )
-            btn.configure(activebackground="#E3F2FD", activeforeground=self.text_color, indicatoron=False)
-            return btn
-
-        def _build_menu(button: tk.Menubutton) -> tk.Menu:
-            return tk.Menu(
-                button,
+        def _create_menu_button(label: str, items: list[tuple[str, Callable[[], None]]]) -> ttk.Button:
+            btn = ttk.Button(nav_container, text=label, style="TopNav.TMenubutton")
+            menu = tk.Menu(
+                btn,
                 tearoff=0,
                 background="#FFFFFF",
                 foreground=self.text_color,
@@ -175,12 +159,22 @@ class EbayListingApp:
                 borderwidth=0,
                 relief="flat",
             )
+            for text, command in items:
+                menu.add_command(label=text, command=command)
 
-        file_button = _nav_menubutton("File")
-        file_menu = _build_menu(file_button)
-        file_menu.add_command(label="Exit", command=self.root.quit)
-        file_button.configure(menu=file_menu)
-        file_button.pack(side="left", padx=4)
+            def show_menu(_: Any | None = None) -> None:
+                x = btn.winfo_rootx()
+                y = btn.winfo_rooty() + btn.winfo_height()
+                try:
+                    menu.tk_popup(x, y)
+                finally:
+                    menu.grab_release()
+
+            btn.configure(command=show_menu)
+            btn.pack(side="left", padx=4)
+            return btn
+
+        _create_menu_button("File", [("Exit", self.root.quit)])
 
         ttk.Button(
             nav_container,
@@ -189,26 +183,27 @@ class EbayListingApp:
             command=self.show_main,
         ).pack(side="left", padx=4)
 
-        categories_button = _nav_menubutton("Categories")
-        categories_menu = _build_menu(categories_button)
-        categories_menu.add_command(label="Add/Edit/Delete Categories", command=self.show_add_category)
-        categories_button.configure(menu=categories_menu)
-        categories_button.pack(side="left", padx=4)
+        _create_menu_button(
+            "Categories",
+            [("Add/Edit/Delete Categories", self.show_add_category)],
+        )
 
-        listings_button = _nav_menubutton("Listings")
-        listings_menu = _build_menu(listings_button)
-        listings_menu.add_command(label="Add a New Item", command=self.show_add_item)
-        listings_menu.add_command(label="Items Added", command=self.show_items_added)
-        listings_menu.add_command(label="Items Ended", command=self.show_end_item)
-        listings_button.configure(menu=listings_menu)
-        listings_button.pack(side="left", padx=4)
+        _create_menu_button(
+            "Listings",
+            [
+                ("Add a New Item", self.show_add_item),
+                ("Items Added", self.show_items_added),
+                ("Items Ended", self.show_end_item),
+            ],
+        )
 
-        settings_button = _nav_menubutton("Settings")
-        settings_menu = _build_menu(settings_button)
-        settings_menu.add_command(label="App Settings", command=self.show_settings)
-        settings_menu.add_command(label="Storage Config", command=self.show_storage_config)
-        settings_button.configure(menu=settings_menu)
-        settings_button.pack(side="left", padx=4)
+        _create_menu_button(
+            "Settings",
+            [
+                ("App Settings", self.show_settings),
+                ("Storage Config", self.show_storage_config),
+            ],
+        )
 
         ttk.Button(
             nav_container,
