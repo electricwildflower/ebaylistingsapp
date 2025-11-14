@@ -255,9 +255,12 @@ class AddItemView(tk.Frame):
         ttk.Entry(date_added_row, textvariable=self._dialog_vars["date_added"], width=52).grid(
             row=0, column=0, sticky="we"
         )
-        ttk.Button(date_added_row, text="Pick Date", command=lambda: self._open_date_picker("date_added")).grid(
-            row=0, column=1, padx=(12, 0)
-        )
+        ttk.Button(
+            date_added_row,
+            text="Pick Date",
+            style="Secondary.TButton",
+            command=lambda: self._open_date_picker("date_added"),
+        ).grid(row=0, column=1, padx=(12, 0))
 
         ttk.Label(parent, text="End Date (DD-MM-YYYY)", style="TLabel").grid(row=10, column=0, sticky="w")
         end_date_row = tk.Frame(parent, bg=self.card_bg)
@@ -266,9 +269,12 @@ class AddItemView(tk.Frame):
         ttk.Entry(end_date_row, textvariable=self._dialog_vars["end_date"], width=52).grid(
             row=0, column=0, sticky="we"
         )
-        ttk.Button(end_date_row, text="Pick Date", command=lambda: self._open_date_picker("end_date")).grid(
-            row=0, column=1, padx=(12, 0)
-        )
+        ttk.Button(
+            end_date_row,
+            text="Pick Date",
+            style="Secondary.TButton",
+            command=lambda: self._open_date_picker("end_date"),
+        ).grid(row=0, column=1, padx=(12, 0))
 
         ttk.Label(parent, text="Image URL", style="TLabel").grid(row=12, column=0, sticky="w")
         url_row = tk.Frame(parent, bg=self.card_bg)
@@ -278,7 +284,12 @@ class AddItemView(tk.Frame):
         image_entry = ttk.Entry(url_row, textvariable=self._dialog_vars["image_url"], width=52)
         image_entry.grid(row=0, column=0, sticky="we", padx=(0, 12))
         self._enable_right_click_paste(image_entry)
-        ttk.Button(url_row, text="Preview", command=self._update_image_preview, width=10).grid(row=0, column=1)
+        ttk.Button(
+            url_row,
+            text="Preview",
+            style="Secondary.TButton",
+            command=self._update_image_preview,
+        ).grid(row=0, column=1)
 
         preview_container = tk.Frame(parent, bg=self.card_bg)
         preview_container.grid(row=14, column=0, sticky="we", pady=(4, 16))
@@ -909,7 +920,21 @@ class AddItemView(tk.Frame):
         header = tk.Frame(card, bg=self.card_bg)
         header.pack(fill="x", pady=(0, 12))
 
-        ttk.Button(header, text="‹", width=3, command=lambda: self._shift_date_month(-1)).pack(side="left")
+        prev_btn = tk.Button(
+            header,
+            text="‹",
+            width=3,
+            bd=0,
+            relief="flat",
+            bg="#EEF3FB",
+            fg="#1E2C3A",
+            activebackground=self.accent_color,
+            activeforeground="#FFFFFF",
+            font=("Segoe UI Semibold", 12),
+            command=lambda: self._shift_date_month(-1),
+            cursor="hand2",
+        )
+        prev_btn.pack(side="left")
         self._date_label = tk.Label(
             header,
             text="",
@@ -918,7 +943,21 @@ class AddItemView(tk.Frame):
             fg=self.text_color,
         )
         self._date_label.pack(side="left", expand=True)
-        ttk.Button(header, text="›", width=3, command=lambda: self._shift_date_month(1)).pack(side="right")
+        next_btn = tk.Button(
+            header,
+            text="›",
+            width=3,
+            bd=0,
+            relief="flat",
+            bg="#EEF3FB",
+            fg="#1E2C3A",
+            activebackground=self.accent_color,
+            activeforeground="#FFFFFF",
+            font=("Segoe UI Semibold", 12),
+            command=lambda: self._shift_date_month(1),
+            cursor="hand2",
+        )
+        next_btn.pack(side="right")
 
         self._calendar_container = tk.Frame(card, bg=self.card_bg)
         self._calendar_container.pack()
