@@ -2,7 +2,7 @@ import json
 import os
 import tkinter as tk
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Callable
 from tkinter import filedialog, messagebox, ttk
 
 try:
