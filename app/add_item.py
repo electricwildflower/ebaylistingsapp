@@ -339,6 +339,28 @@ class AddItemView(tk.Frame):
             self._dialog_vars["category"].set(self._dialog_default_category)
 
     def _configure_combobox_style(self) -> None:
+        if self._combobox_style_configured:
+            if hasattr(self, "category_combo"):
+                self.category_combo.configure(style="Category.TCombobox")
+            return
+        style = ttk.Style(self)
+        style.configure(
+            "Category.TCombobox",
+            fieldbackground="#FFFFFF",
+            background="#E3F2FD",
+            bordercolor="#D0DDF0",
+            relief="flat",
+            padding=6,
+        )
+        style.map(
+            "Category.TCombobox",
+            fieldbackground=[("readonly", "#FFFFFF"), ("focus", "#FFFFFF")],
+            bordercolor=[("focus", "#1E88E5")],
+        )
+        if hasattr(self, "category_combo"):
+            self.category_combo.configure(style="Category.TCombobox")
+        self._combobox_style_configured = True
+
     def _import_listing_details(self) -> None:
         url = self._dialog_vars["listing_url"].get().strip()
         if not url:
