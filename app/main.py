@@ -147,16 +147,37 @@ class EbayListingApp:
         nav_container = tk.Frame(row, bg="#FFFFFF")
         nav_container.pack(side="left", padx=(16, 8), pady=4)
 
-        file_button = ttk.Menubutton(nav_container, text="File", style="TopNav.TMenubutton", direction="below")
-        file_menu = tk.Menu(
-            file_button,
-            tearoff=0,
-            background="#FFFFFF",
-            foreground=self.text_color,
-            activebackground=self.accent_color,
-            activeforeground="white",
-            borderwidth=0,
-        )
+        def _nav_menubutton(label: str) -> tk.Menubutton:
+            btn = tk.Menubutton(
+                nav_container,
+                text=label,
+                bg="#FFFFFF",
+                fg=self.text_color,
+                font=("Segoe UI Semibold", 11),
+                padx=12,
+                pady=6,
+                relief="flat",
+                borderwidth=0,
+                highlightthickness=0,
+                cursor="hand2",
+            )
+            btn.configure(activebackground="#E3F2FD", activeforeground=self.text_color, indicatoron=False)
+            return btn
+
+        def _build_menu(button: tk.Menubutton) -> tk.Menu:
+            return tk.Menu(
+                button,
+                tearoff=0,
+                background="#FFFFFF",
+                foreground=self.text_color,
+                activebackground=self.accent_color,
+                activeforeground="white",
+                borderwidth=0,
+                relief="flat",
+            )
+
+        file_button = _nav_menubutton("File")
+        file_menu = _build_menu(file_button)
         file_menu.add_command(label="Exit", command=self.root.quit)
         file_button.configure(menu=file_menu)
         file_button.pack(side="left", padx=4)
@@ -168,65 +189,33 @@ class EbayListingApp:
             command=self.show_main,
         ).pack(side="left", padx=4)
 
-        categories_button = ttk.Menubutton(
-            nav_container,
-            text="Categories",
-            style="TopNav.TMenubutton",
-            direction="below",
-        )
-        categories_menu = tk.Menu(
-            categories_button,
-            tearoff=0,
-            background="#FFFFFF",
-            foreground=self.text_color,
-            activebackground=self.accent_color,
-            activeforeground="white",
-            borderwidth=0,
-        )
+        categories_button = _nav_menubutton("Categories")
+        categories_menu = _build_menu(categories_button)
         categories_menu.add_command(label="Add/Edit/Delete Categories", command=self.show_add_category)
         categories_button.configure(menu=categories_menu)
         categories_button.pack(side="left", padx=4)
 
-        listings_button = ttk.Menubutton(
-            nav_container,
-            text="Listings",
-            style="TopNav.TMenubutton",
-            direction="below",
-        )
-        listings_menu = tk.Menu(
-            listings_button,
-            tearoff=0,
-            background="#FFFFFF",
-            foreground=self.text_color,
-            activebackground=self.accent_color,
-            activeforeground="white",
-            borderwidth=0,
-        )
+        listings_button = _nav_menubutton("Listings")
+        listings_menu = _build_menu(listings_button)
         listings_menu.add_command(label="Add a New Item", command=self.show_add_item)
         listings_menu.add_command(label="Items Added", command=self.show_items_added)
         listings_menu.add_command(label="Items Ended", command=self.show_end_item)
         listings_button.configure(menu=listings_menu)
         listings_button.pack(side="left", padx=4)
 
-        settings_button = ttk.Menubutton(
-            nav_container,
-            text="Settings",
-            style="TopNav.TMenubutton",
-            direction="below",
-        )
-        settings_menu = tk.Menu(
-            settings_button,
-            tearoff=0,
-            background="#FFFFFF",
-            foreground=self.text_color,
-            activebackground=self.accent_color,
-            activeforeground="white",
-            borderwidth=0,
-        )
+        settings_button = _nav_menubutton("Settings")
+        settings_menu = _build_menu(settings_button)
         settings_menu.add_command(label="App Settings", command=self.show_settings)
         settings_menu.add_command(label="Storage Config", command=self.show_storage_config)
         settings_button.configure(menu=settings_menu)
         settings_button.pack(side="left", padx=4)
+
+        ttk.Button(
+            nav_container,
+            text="Trending",
+            style="TopNav.TMenubutton",
+            command=self.show_trending,
+        ).pack(side="left", padx=4)
 
         spacer = tk.Frame(row, bg="#FFFFFF")
         spacer.pack(side="left", fill="x", expand=True)
@@ -316,6 +305,8 @@ class EbayListingApp:
 
         self.storage_config_frame = tk.Frame(self.content_container, bg=self.primary_bg)
         self._build_storage_config_view()
+        self.trending_frame = tk.Frame(self.content_container, bg=self.primary_bg)
+        self._build_trending_view()
 
         self._build_main_hero_title()
 
@@ -375,6 +366,7 @@ class EbayListingApp:
             self.items_added_frame,
             self.end_item_frame,
             self.storage_config_frame,
+            self.trending_frame,
             self.first_run_frame,
         ):
             widget.pack_forget()
@@ -421,6 +413,10 @@ class EbayListingApp:
         self._show_top_bar()
         self.end_item_frame.set_items(self.items)
         self._show_frame(self.end_item_frame)
+
+    def show_trending(self) -> None:
+        self._show_top_bar()
+        self._show_frame(self.trending_frame)
 
     def show_storage_config(self) -> None:
         self._show_top_bar()
@@ -1107,6 +1103,8 @@ class EbayListingApp:
             self.show_add_category()
         elif frame is self.settings_view:
             self.show_settings()
+        elif frame is self.trending_frame:
+            self.show_trending()
         elif frame is self.storage_config_frame:
             self.show_storage_config()
         else:
@@ -1185,6 +1183,23 @@ class EbayListingApp:
             self.storage_info_var.set(self.storage_path)
         else:
             self.storage_info_var.set("No storage location selected yet.")
+
+    def _build_trending_view(self) -> None:
+        frame = self.trending_frame
+        frame.configure(bg=self.primary_bg)
+
+        container = tk.Frame(frame, bg=self.primary_bg)
+        container.pack(fill="both", expand=True, padx=40, pady=60)
+
+        self._create_colored_heading(container, "Trending")
+
+        tk.Label(
+            container,
+            text="Trending",
+            font=("Segoe UI", 13),
+            bg=self.primary_bg,
+            fg="#41566F",
+        ).pack(anchor="w")
 
     def _create_colored_heading(
         self,

@@ -84,6 +84,7 @@ class AddItemView(tk.Frame):
         self._detail_overlay: tk.Frame | None = None
         self._detail_callback: Callable[[], None] | None = None
         self._dialog_default_category: str | None = None
+        self._combobox_style_configured = False
 
         self._load_items()
         self._build_layout()
@@ -234,6 +235,7 @@ class AddItemView(tk.Frame):
             width=42,
         )
         self.category_combo.grid(row=1, column=0, sticky="we", pady=(4, 16))
+        self._configure_combobox_style()
 
         ttk.Label(parent, text="Item Name", style="TLabel").grid(row=2, column=0, sticky="w")
         ttk.Entry(parent, textvariable=self._dialog_vars["name"], width=54).grid(
@@ -319,6 +321,27 @@ class AddItemView(tk.Frame):
             self._populate_form(item_data)
         elif self._dialog_default_category and self._dialog_default_category in categories:
             self._dialog_vars["category"].set(self._dialog_default_category)
+
+    def _configure_combobox_style(self) -> None:
+        if self._combobox_style_configured:
+            self.category_combo.configure(style="Category.TCombobox")
+            return
+        style = ttk.Style(self.category_combo)
+        style.configure(
+            "Category.TCombobox",
+            fieldbackground="#FFFFFF",
+            background="#E3F2FD",
+            bordercolor="#D0DDF0",
+            relief="flat",
+            padding=6,
+        )
+        style.map(
+            "Category.TCombobox",
+            fieldbackground=[("readonly", "#FFFFFF"), ("focus", "#FFFFFF")],
+            bordercolor=[("focus", "#1E88E5")],
+        )
+        self.category_combo.configure(style="Category.TCombobox")
+        self._combobox_style_configured = True
 
     def _enable_right_click_paste(self, widget: tk.Widget) -> None:
         menu = tk.Menu(widget, tearoff=0)
