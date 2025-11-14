@@ -6,6 +6,7 @@ import json
 import os
 import urllib.request
 from datetime import date, datetime
+from html import unescape
 from io import BytesIO
 from typing import Any, Callable
 from uuid import uuid4
@@ -225,6 +226,7 @@ class AddItemView(tk.Frame):
         self._dialog_vars["date_added"] = tk.StringVar(value=self._date_to_display(date.today()))
         self._dialog_vars["end_date"] = tk.StringVar()
         self._dialog_vars["image_url"] = tk.StringVar()
+        self._dialog_vars["listing_url"] = tk.StringVar()
 
         ttk.Label(parent, text="Category", style="TLabel").grid(row=0, column=0, sticky="w")
         self.category_combo = ttk.Combobox(
@@ -250,9 +252,23 @@ class AddItemView(tk.Frame):
         self._notes_text = tk.Text(parent, width=64, height=4, font=("Segoe UI", 11))
         self._notes_text.grid(row=7, column=0, sticky="we", pady=(4, 16))
 
-        ttk.Label(parent, text="Date Added (DD-MM-YYYY)", style="TLabel").grid(row=8, column=0, sticky="w")
+        ttk.Label(parent, text="eBay Listing URL (optional)", style="TLabel").grid(row=8, column=0, sticky="w")
+        listing_row = tk.Frame(parent, bg=self.card_bg)
+        listing_row.grid(row=9, column=0, sticky="we", pady=(4, 16))
+        listing_row.columnconfigure(0, weight=1)
+        listing_entry = ttk.Entry(listing_row, textvariable=self._dialog_vars["listing_url"], width=52)
+        listing_entry.grid(row=0, column=0, sticky="we")
+        self._enable_right_click_paste(listing_entry)
+        ttk.Button(
+            listing_row,
+            text="Import",
+            style="Secondary.TButton",
+            command=self._import_listing_details,
+        ).grid(row=0, column=1, padx=(12, 0))
+
+        ttk.Label(parent, text="Date Added (DD-MM-YYYY)", style="TLabel").grid(row=10, column=0, sticky="w")
         date_added_row = tk.Frame(parent, bg=self.card_bg)
-        date_added_row.grid(row=9, column=0, sticky="we", pady=(4, 16))
+        date_added_row.grid(row=10, column=0, sticky="we", pady=(4, 16))
         date_added_row.columnconfigure(0, weight=1)
         ttk.Entry(date_added_row, textvariable=self._dialog_vars["date_added"], width=52).grid(
             row=0, column=0, sticky="we"
@@ -264,9 +280,9 @@ class AddItemView(tk.Frame):
             command=lambda: self._open_date_picker("date_added"),
         ).grid(row=0, column=1, padx=(12, 0))
 
-        ttk.Label(parent, text="End Date (DD-MM-YYYY)", style="TLabel").grid(row=10, column=0, sticky="w")
+        ttk.Label(parent, text="End Date (DD-MM-YYYY)", style="TLabel").grid(row=12, column=0, sticky="w")
         end_date_row = tk.Frame(parent, bg=self.card_bg)
-        end_date_row.grid(row=11, column=0, sticky="we", pady=(4, 16))
+        end_date_row.grid(row=13, column=0, sticky="we", pady=(4, 16))
         end_date_row.columnconfigure(0, weight=1)
         ttk.Entry(end_date_row, textvariable=self._dialog_vars["end_date"], width=52).grid(
             row=0, column=0, sticky="we"
@@ -278,9 +294,9 @@ class AddItemView(tk.Frame):
             command=lambda: self._open_date_picker("end_date"),
         ).grid(row=0, column=1, padx=(12, 0))
 
-        ttk.Label(parent, text="Image URL", style="TLabel").grid(row=12, column=0, sticky="w")
+        ttk.Label(parent, text="Image URL", style="TLabel").grid(row=14, column=0, sticky="w")
         url_row = tk.Frame(parent, bg=self.card_bg)
-        url_row.grid(row=13, column=0, sticky="we", pady=(4, 12))
+        url_row.grid(row=15, column=0, sticky="we", pady=(4, 12))
         url_row.columnconfigure(0, weight=1)
 
         image_entry = ttk.Entry(url_row, textvariable=self._dialog_vars["image_url"], width=52)
@@ -294,7 +310,7 @@ class AddItemView(tk.Frame):
         ).grid(row=0, column=1)
 
         preview_container = tk.Frame(parent, bg=self.card_bg)
-        preview_container.grid(row=14, column=0, sticky="we", pady=(4, 16))
+        preview_container.grid(row=16, column=0, sticky="we", pady=(4, 16))
         preview_container.columnconfigure(0, weight=1)
 
         self._image_preview_label = tk.Label(
@@ -308,7 +324,7 @@ class AddItemView(tk.Frame):
         self._image_preview_label.pack(fill="both", expand=True)
 
         button_row = tk.Frame(parent, bg=self.card_bg)
-        button_row.grid(row=15, column=0, sticky="e", pady=(10, 0))
+        button_row.grid(row=17, column=0, sticky="e", pady=(10, 0))
 
         ttk.Button(button_row, text="Save", style="Primary.TButton", command=self._handle_save).pack(side="left")
         ttk.Button(button_row, text="Cancel", style="Secondary.TButton", command=self._handle_cancel).pack(
@@ -321,6 +337,105 @@ class AddItemView(tk.Frame):
             self._populate_form(item_data)
         elif self._dialog_default_category and self._dialog_default_category in categories:
             self._dialog_vars["category"].set(self._dialog_default_category)
+
+    def _configure_combobox_style(self) -> None:
+    def _import_listing_details(self) -> None:
+        url = self._dialog_vars["listing_url"].get().strip()
+        if not url:
+            messagebox.showwarning("Import Listing", "Please enter a listing URL first.", parent=self.winfo_toplevel())
+            return
+        try:
+            request = urllib.request.Request(
+                url,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+                },
+            )
+            with urllib.request.urlopen(request, timeout=10) as response:
+                charset = response.headers.get_content_charset() or "utf-8"
+                html = response.read().decode(charset, errors="ignore")
+        except Exception as exc:
+            messagebox.showerror(
+                "Import Listing",
+                f"Unable to fetch listing information.\n\n{exc}",
+                parent=self.winfo_toplevel(),
+            )
+            return
+
+        title = self._extract_meta_content(html, ["og:title", "twitter:title"]) or self._extract_title_tag(html)
+        description = self._extract_meta_content(html, ["og:description", "twitter:description"])
+        image_url = self._extract_meta_content(html, ["og:image", "twitter:image"])
+
+        if title:
+            self._dialog_vars["name"].set(title)
+        if description and self._description_text:
+            self._description_text.delete("1.0", "end")
+            self._description_text.insert("1.0", description)
+        if image_url:
+            self._dialog_vars["image_url"].set(image_url)
+            self._update_image_preview()
+
+        summary_parts = []
+        if title:
+            summary_parts.append("name")
+        if description:
+            summary_parts.append("description")
+        if image_url:
+            summary_parts.append("image")
+
+        if summary_parts:
+            messagebox.showinfo(
+                "Import Listing",
+                f"Import complete: {', '.join(summary_parts)} updated.",
+                parent=self.winfo_toplevel(),
+            )
+        else:
+            messagebox.showwarning(
+                "Import Listing",
+                "The listing was fetched but relevant details were not detected.",
+                parent=self.winfo_toplevel(),
+            )
+
+    def _extract_meta_content(self, html: str, properties: list[str]) -> str | None:
+        html_lower = html.lower()
+        for prop in properties:
+            prop_lower = prop.lower()
+            idx = html_lower.find(f'property="{prop_lower}"')
+            if idx == -1:
+                idx = html_lower.find(f'name="{prop_lower}"')
+            if idx == -1:
+                continue
+            content_idx = html_lower.find('content="', idx)
+            if content_idx == -1:
+                continue
+            content_idx += len('content="')
+            end_idx = html_lower.find('"', content_idx)
+            if end_idx == -1:
+                continue
+            return unescape(html[content_idx:end_idx]).strip()
+        return None
+
+    def _extract_title_tag(self, html: str) -> str | None:
+        start = html.lower().find("<title>")
+        end = html.lower().find("</title>")
+        if start != -1 and end != -1 and end > start:
+            content = html[start + len("<title>") : end]
+            return unescape(content.strip())
+        return None
+
+    def _enable_right_click_paste(self, widget: tk.Widget) -> None:
+        menu = tk.Menu(widget, tearoff=0)
+        menu.add_command(label="Paste", command=lambda: widget.event_generate("<<Paste>>"))
+
+        def show_menu(event: Any) -> None:
+            try:
+                menu.tk_popup(event.x_root, event.y_root)
+            finally:
+                menu.grab_release()
+
+        widget.bind("<Button-3>", show_menu)
+        widget.bind("<Control-Button-1>", show_menu)
 
     def _configure_combobox_style(self) -> None:
         if self._combobox_style_configured:
@@ -342,19 +457,6 @@ class AddItemView(tk.Frame):
         )
         self.category_combo.configure(style="Category.TCombobox")
         self._combobox_style_configured = True
-
-    def _enable_right_click_paste(self, widget: tk.Widget) -> None:
-        menu = tk.Menu(widget, tearoff=0)
-        menu.add_command(label="Paste", command=lambda: widget.event_generate("<<Paste>>"))
-
-        def show_menu(event: Any) -> None:
-            try:
-                menu.tk_popup(event.x_root, event.y_root)
-            finally:
-                menu.grab_release()
-
-        widget.bind("<Button-3>", show_menu)
-        widget.bind("<Control-Button-1>", show_menu)
 
     def _populate_form(self, item: dict[str, Any]) -> None:
         self._dialog_vars["category"].set(item.get("category", ""))
