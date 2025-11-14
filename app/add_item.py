@@ -57,6 +57,8 @@ class AddItemView(tk.Frame):
         self.primary_bg = primary_bg
         self.text_color = text_color
         self.card_bg = "#FFFFFF"
+        self.accent_color = "#0064D2"
+        self.accent_hover = "#0049A4"
         self.storage_path = storage_path
         self.categories_provider = categories_provider
         self._items_changed_callback = on_items_changed
@@ -273,9 +275,9 @@ class AddItemView(tk.Frame):
         url_row.grid(row=13, column=0, sticky="we", pady=(4, 12))
         url_row.columnconfigure(0, weight=1)
 
-        ttk.Entry(url_row, textvariable=self._dialog_vars["image_url"], width=52).grid(
-            row=0, column=0, sticky="we", padx=(0, 12)
-        )
+        image_entry = ttk.Entry(url_row, textvariable=self._dialog_vars["image_url"], width=52)
+        image_entry.grid(row=0, column=0, sticky="we", padx=(0, 12))
+        self._enable_right_click_paste(image_entry)
         ttk.Button(url_row, text="Preview", command=self._update_image_preview, width=10).grid(row=0, column=1)
 
         preview_container = tk.Frame(parent, bg=self.card_bg)
@@ -306,6 +308,19 @@ class AddItemView(tk.Frame):
             self._populate_form(item_data)
         elif self._dialog_default_category and self._dialog_default_category in categories:
             self._dialog_vars["category"].set(self._dialog_default_category)
+
+    def _enable_right_click_paste(self, widget: tk.Widget) -> None:
+        menu = tk.Menu(widget, tearoff=0)
+        menu.add_command(label="Paste", command=lambda: widget.event_generate("<<Paste>>"))
+
+        def show_menu(event: Any) -> None:
+            try:
+                menu.tk_popup(event.x_root, event.y_root)
+            finally:
+                menu.grab_release()
+
+        widget.bind("<Button-3>", show_menu)
+        widget.bind("<Control-Button-1>", show_menu)
 
     def _populate_form(self, item: dict[str, Any]) -> None:
         self._dialog_vars["category"].set(item.get("category", ""))
@@ -861,41 +876,61 @@ class AddItemView(tk.Frame):
         parsed_value = self._parse_date_string(current_value)
         year = parsed_value.year if parsed_value else today.year
         month = parsed_value.month if parsed_value else today.month
+        selected_day = parsed_value.day if parsed_value else None
 
-        self._date_picker_state = {"field": target_field, "year": year, "month": month}
+        self._date_picker_state = {
+            "field": target_field,
+            "year": year,
+            "month": month,
+            "selected_day": selected_day,
+        }
 
         self._date_picker_window = tk.Toplevel(self._dialog)
         self._date_picker_window.transient(self._dialog)
         self._date_picker_window.grab_set()
         self._date_picker_window.resizable(False, False)
+        self._date_picker_window.configure(bg=self.primary_bg)
         self._date_picker_window.title("Select Date")
+        self._date_picker_window.bind("<Escape>", lambda _: self._close_date_picker())
 
-        frame = tk.Frame(self._date_picker_window, bg=self.primary_bg, padx=12, pady=12)
-        frame.pack(fill="both", expand=True)
+        outer = tk.Frame(self._date_picker_window, bg=self.primary_bg)
+        outer.pack(fill="both", expand=True, padx=12, pady=12)
 
-        header = tk.Frame(frame, bg=self.primary_bg)
-        header.pack(fill="x", pady=(0, 8))
+        card = tk.Frame(
+            outer,
+            bg=self.card_bg,
+            padx=20,
+            pady=18,
+            highlightthickness=1,
+            highlightbackground="#D7E3F5",
+        )
+        card.pack(fill="both", expand=True)
 
-        ttk.Button(header, text="<", width=3, command=lambda: self._shift_date_month(-1)).pack(side="left")
+        header = tk.Frame(card, bg=self.card_bg)
+        header.pack(fill="x", pady=(0, 12))
+
+        ttk.Button(header, text="‹", width=3, command=lambda: self._shift_date_month(-1)).pack(side="left")
         self._date_label = tk.Label(
             header,
             text="",
-            font=("Segoe UI Semibold", 12),
-            bg=self.primary_bg,
+            font=("Segoe UI Semibold", 14),
+            bg=self.card_bg,
             fg=self.text_color,
         )
         self._date_label.pack(side="left", expand=True)
-        ttk.Button(header, text=">", width=3, command=lambda: self._shift_date_month(1)).pack(side="right")
+        ttk.Button(header, text="›", width=3, command=lambda: self._shift_date_month(1)).pack(side="right")
 
-        self._calendar_container = tk.Frame(frame, bg=self.primary_bg)
+        self._calendar_container = tk.Frame(card, bg=self.card_bg)
         self._calendar_container.pack()
 
+        footer = tk.Frame(card, bg=self.card_bg)
+        footer.pack(fill="x", pady=(16, 0))
         ttk.Button(
-            frame,
+            footer,
             text="Cancel",
             style="Secondary.TButton",
             command=self._close_date_picker,
-        ).pack(pady=(10, 0))
+        ).pack(side="right")
 
         self._render_calendar_grid()
 
@@ -904,14 +939,19 @@ class AddItemView(tk.Frame):
             return
         year = self._date_picker_state["year"]
         month = self._date_picker_state["month"] + delta
+        selected_day = self._date_picker_state.get("selected_day")
         while month < 1:
             month += 12
             year -= 1
         while month > 12:
             month -= 12
             year += 1
+        max_day = calendar.monthrange(year, month)[1]
+        if selected_day and selected_day > max_day:
+            selected_day = max_day
         self._date_picker_state["year"] = year
         self._date_picker_state["month"] = month
+        self._date_picker_state["selected_day"] = selected_day
         self._render_calendar_grid()
 
     def _render_calendar_grid(self) -> None:
@@ -927,33 +967,58 @@ class AddItemView(tk.Frame):
         if hasattr(self, "_date_label"):
             self._date_label.configure(text=f"{calendar.month_name[month]} {year}")
 
-        weekday_header = tk.Frame(self._calendar_container, bg=self.primary_bg)
-        weekday_header.pack()
-        for weekday in ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]:
+        weekday_header = tk.Frame(self._calendar_container, bg=self.card_bg)
+        weekday_header.pack(pady=(0, 6))
+        for weekday in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]:
             tk.Label(
                 weekday_header,
                 text=weekday,
                 width=4,
                 font=("Segoe UI", 10),
-                bg=self.primary_bg,
-                fg=self.text_color,
-            ).pack(side="left")
+                bg=self.card_bg,
+                fg="#60738A",
+            ).pack(side="left", padx=2)
+
+        today = date.today()
+        selected_day = self._date_picker_state.get("selected_day")
 
         for week in calendar.monthcalendar(year, month):
-            row = tk.Frame(self._calendar_container, bg=self.primary_bg)
-            row.pack()
+            row = tk.Frame(self._calendar_container, bg=self.card_bg)
+            row.pack(pady=2)
             for day in week:
                 if day == 0:
-                    tk.Label(row, text=" ", width=4, bg=self.primary_bg).pack(side="left")
+                    tk.Label(row, text=" ", width=4, bg=self.card_bg).pack(side="left", padx=2, pady=2)
                     continue
 
-                btn = ttk.Button(
+                is_today = day == today.day and month == today.month and year == today.year
+                is_selected = selected_day == day
+
+                base_bg = "#F4F7FB"
+                fg_color = "#1E2C3A"
+                font = ("Segoe UI", 11)
+
+                if is_today:
+                    base_bg = "#E3F2FD"
+                if is_selected:
+                    base_bg = self.accent_color
+                    fg_color = "#FFFFFF"
+                    font = ("Segoe UI Semibold", 11)
+
+                btn = tk.Button(
                     row,
                     text=str(day),
                     width=4,
+                    bd=0,
+                    relief="flat",
+                    bg=base_bg,
+                    fg=fg_color,
+                    activebackground=self.accent_hover,
+                    activeforeground="#FFFFFF",
+                    font=font,
                     command=lambda d=day: self._select_date(d),
+                    cursor="hand2",
                 )
-                btn.pack(side="left")
+                btn.pack(side="left", padx=2, pady=2)
 
     def _select_date(self, day: int) -> None:
         if not self._date_picker_state:
@@ -969,6 +1034,7 @@ class AddItemView(tk.Frame):
         field = self._date_picker_state.get("field")
         if field and field in self._dialog_vars:
             self._dialog_vars[field].set(self._date_to_display(selected))
+        self._date_picker_state["selected_day"] = day
         self._close_date_picker()
 
     def _close_date_picker(self) -> None:
