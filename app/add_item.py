@@ -238,19 +238,22 @@ class AddItemView(tk.Frame):
         )
         self.category_combo.grid(row=1, column=0, sticky="we", pady=(4, 16))
         self._configure_combobox_style()
+        self._add_context_menu(self.category_combo)
 
         ttk.Label(parent, text="Item Name", style="TLabel").grid(row=2, column=0, sticky="w")
-        ttk.Entry(parent, textvariable=self._dialog_vars["name"], width=54).grid(
-            row=3, column=0, sticky="we", pady=(4, 16)
-        )
+        name_entry = ttk.Entry(parent, textvariable=self._dialog_vars["name"], width=54)
+        name_entry.grid(row=3, column=0, sticky="we", pady=(4, 16))
+        self._add_context_menu(name_entry)
 
         ttk.Label(parent, text="Description", style="TLabel").grid(row=4, column=0, sticky="w")
         self._description_text = tk.Text(parent, width=64, height=6, font=("Segoe UI", 11))
         self._description_text.grid(row=5, column=0, sticky="we", pady=(4, 16))
+        self._add_context_menu(self._description_text)
 
         ttk.Label(parent, text="Notes", style="TLabel").grid(row=6, column=0, sticky="w")
         self._notes_text = tk.Text(parent, width=64, height=4, font=("Segoe UI", 11))
         self._notes_text.grid(row=7, column=0, sticky="we", pady=(4, 16))
+        self._add_context_menu(self._notes_text)
 
         ttk.Label(parent, text="eBay Listing URL (optional)", style="TLabel").grid(row=8, column=0, sticky="w")
         listing_row = tk.Frame(parent, bg=self.card_bg)
@@ -270,9 +273,9 @@ class AddItemView(tk.Frame):
         date_added_row = tk.Frame(parent, bg=self.card_bg)
         date_added_row.grid(row=10, column=0, sticky="we", pady=(4, 16))
         date_added_row.columnconfigure(0, weight=1)
-        ttk.Entry(date_added_row, textvariable=self._dialog_vars["date_added"], width=52).grid(
-            row=0, column=0, sticky="we"
-        )
+        date_added_entry = ttk.Entry(date_added_row, textvariable=self._dialog_vars["date_added"], width=52)
+        date_added_entry.grid(row=0, column=0, sticky="we")
+        self._add_context_menu(date_added_entry)
         ttk.Button(
             date_added_row,
             text="Pick Date",
@@ -284,9 +287,9 @@ class AddItemView(tk.Frame):
         end_date_row = tk.Frame(parent, bg=self.card_bg)
         end_date_row.grid(row=13, column=0, sticky="we", pady=(4, 16))
         end_date_row.columnconfigure(0, weight=1)
-        ttk.Entry(end_date_row, textvariable=self._dialog_vars["end_date"], width=52).grid(
-            row=0, column=0, sticky="we"
-        )
+        end_date_entry = ttk.Entry(end_date_row, textvariable=self._dialog_vars["end_date"], width=52)
+        end_date_entry.grid(row=0, column=0, sticky="we")
+        self._add_context_menu(end_date_entry)
         ttk.Button(
             end_date_row,
             text="Pick Date",
@@ -446,18 +449,68 @@ class AddItemView(tk.Frame):
             return unescape(content.strip())
         return None
 
-    def _enable_right_click_paste(self, widget: tk.Widget) -> None:
-        menu = tk.Menu(widget, tearoff=0)
-        menu.add_command(label="Paste", command=lambda: widget.event_generate("<<Paste>>"))
-
+    def _add_context_menu(self, widget: tk.Widget) -> None:
+        """Add right-click context menu with Copy, Paste, and Cut to text input widgets."""
+        # App theme colors
+        menu_bg = self.card_bg  # white
+        menu_fg = self.text_color  # dark blue
+        menu_active_bg = self.accent_color  # blue
+        menu_active_fg = "#FFFFFF"  # white text on active
+        
+        menu = tk.Menu(
+            widget,
+            tearoff=0,
+            bg=menu_bg,
+            fg=menu_fg,
+            activebackground=menu_active_bg,
+            activeforeground=menu_active_fg,
+            selectcolor=menu_active_bg,
+            borderwidth=1,
+            relief="flat",
+        )
+        
+        def copy_text() -> None:
+            widget.event_generate("<<Copy>>")
+            menu.unpost()
+        
+        def paste_text() -> None:
+            widget.event_generate("<<Paste>>")
+            menu.unpost()
+        
+        def cut_text() -> None:
+            widget.event_generate("<<Cut>>")
+            menu.unpost()
+        
+        menu.add_command(label="Copy", command=copy_text)
+        menu.add_command(label="Paste", command=paste_text)
+        menu.add_command(label="Cut", command=cut_text)
+        
         def show_menu(event: Any) -> None:
             try:
                 menu.tk_popup(event.x_root, event.y_root)
             finally:
-                menu.grab_release()
-
-        widget.bind("<Button-3>", show_menu)
-        widget.bind("<Control-Button-1>", show_menu)
+                # Release grab after menu is shown
+                widget.after_idle(menu.grab_release)
+        
+        def close_menu_on_click(event: Any) -> None:
+            """Close menu when clicking outside the widget."""
+            # Check if click is outside the widget
+            if event.widget != widget and menu.winfo_exists():
+                try:
+                    menu.unpost()
+                except:
+                    pass
+        
+        widget.bind("<Button-3>", show_menu)  # Right-click
+        # Close menu when clicking elsewhere - bind to root window
+        root = widget.winfo_toplevel()
+        root.bind("<Button-1>", close_menu_on_click, add="+")
+        root.bind("<Button-2>", close_menu_on_click, add="+")
+        root.bind("<Button-3>", close_menu_on_click, add="+")
+    
+    def _enable_right_click_paste(self, widget: tk.Widget) -> None:
+        """Legacy method - now uses _add_context_menu."""
+        self._add_context_menu(widget)
 
     def _configure_combobox_style(self) -> None:
         if self._combobox_style_configured:

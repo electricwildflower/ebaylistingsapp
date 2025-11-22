@@ -113,6 +113,65 @@ class AddCategoryView(tk.Frame):
             )
             letter.pack(side="left")
 
+    def _add_context_menu(self, widget: tk.Widget) -> None:
+        """Add right-click context menu with Copy, Paste, and Cut to text input widgets."""
+        # App theme colors
+        menu_bg = self.card_bg  # white
+        menu_fg = self.text_color  # dark blue
+        menu_active_bg = "#1E88E5"  # blue accent
+        menu_active_fg = "#FFFFFF"  # white text on active
+        
+        menu = tk.Menu(
+            widget,
+            tearoff=0,
+            bg=menu_bg,
+            fg=menu_fg,
+            activebackground=menu_active_bg,
+            activeforeground=menu_active_fg,
+            selectcolor=menu_active_bg,
+            borderwidth=1,
+            relief="flat",
+        )
+        
+        def copy_text() -> None:
+            widget.event_generate("<<Copy>>")
+            menu.unpost()
+        
+        def paste_text() -> None:
+            widget.event_generate("<<Paste>>")
+            menu.unpost()
+        
+        def cut_text() -> None:
+            widget.event_generate("<<Cut>>")
+            menu.unpost()
+        
+        menu.add_command(label="Copy", command=copy_text)
+        menu.add_command(label="Paste", command=paste_text)
+        menu.add_command(label="Cut", command=cut_text)
+        
+        def show_menu(event: Any) -> None:
+            try:
+                menu.tk_popup(event.x_root, event.y_root)
+            finally:
+                # Release grab after menu is shown
+                widget.after_idle(menu.grab_release)
+        
+        def close_menu_on_click(event: Any) -> None:
+            """Close menu when clicking outside the widget."""
+            # Check if click is outside the widget
+            if event.widget != widget and menu.winfo_exists():
+                try:
+                    menu.unpost()
+                except:
+                    pass
+        
+        widget.bind("<Button-3>", show_menu)  # Right-click
+        # Close menu when clicking elsewhere - bind to root window
+        root = widget.winfo_toplevel()
+        root.bind("<Button-1>", close_menu_on_click, add="+")
+        root.bind("<Button-2>", close_menu_on_click, add="+")
+        root.bind("<Button-3>", close_menu_on_click, add="+")
+
     def _build_search(self, parent: tk.Frame) -> None:
         search_container = tk.Frame(parent, bg=self.primary_bg)
         search_container.pack(pady=(0, 20))
@@ -125,6 +184,7 @@ class AddCategoryView(tk.Frame):
         )
         entry.pack(ipady=6)
         entry.focus_set()
+        self._add_context_menu(entry)
 
     def _build_actions(self, parent: tk.Frame) -> None:
         ttk.Button(
@@ -243,12 +303,14 @@ class AddCategoryView(tk.Frame):
         name_entry.grid(row=1, column=0, sticky="we", pady=(4, 16))
         name_entry.focus_set()
         name_entry.icursor("end")
+        self._add_context_menu(name_entry)
 
         ttk.Label(dialog_frame, text="Description", style="TLabel").grid(row=2, column=0, sticky="w")
         self._dialog_description = tk.Text(dialog_frame, width=40, height=5, font=("Segoe UI", 11))
         self._dialog_description.grid(row=3, column=0, sticky="we", pady=(4, 16))
         if default_description:
             self._dialog_description.insert("1.0", default_description)
+        self._add_context_menu(self._dialog_description)
 
         tk.Label(
             dialog_frame,
@@ -470,6 +532,7 @@ class AddCategoryView(tk.Frame):
         self._dialog_search_var = tk.StringVar()
         search_entry = ttk.Entry(search_wrapper, textvariable=self._dialog_search_var, width=36)
         search_entry.pack()
+        self._add_context_menu(search_entry)
         self._dialog_search_var.trace_add("write", lambda *_: self._render_dialog_items())
 
         self._dialog = tk.Frame(wrapper, bg=self.card_bg, padx=24, pady=24)

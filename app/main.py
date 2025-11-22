@@ -48,6 +48,66 @@ def _format_date_display(value: str | None) -> str:
     return value
 
 
+def _add_context_menu(widget: tk.Widget) -> None:
+    """Add right-click context menu with Copy and Paste to text input widgets."""
+    # App theme colors
+    menu_bg = "#FFFFFF"  # card_bg - white
+    menu_fg = "#0A2239"  # text_color - dark blue
+    menu_active_bg = "#1E88E5"  # accent_color - blue
+    menu_active_fg = "#FFFFFF"  # white text on active
+    
+    menu = tk.Menu(
+        widget,
+        tearoff=0,
+        bg=menu_bg,
+        fg=menu_fg,
+        activebackground=menu_active_bg,
+        activeforeground=menu_active_fg,
+        selectcolor=menu_active_bg,
+        borderwidth=1,
+        relief="flat",
+    )
+    
+    def copy_text() -> None:
+        widget.event_generate("<<Copy>>")
+        menu.unpost()
+    
+    def paste_text() -> None:
+        widget.event_generate("<<Paste>>")
+        menu.unpost()
+    
+    def cut_text() -> None:
+        widget.event_generate("<<Cut>>")
+        menu.unpost()
+    
+    menu.add_command(label="Copy", command=copy_text)
+    menu.add_command(label="Paste", command=paste_text)
+    menu.add_command(label="Cut", command=cut_text)
+    
+    def show_menu(event: Any) -> None:
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            # Release grab after menu is shown
+            widget.after_idle(menu.grab_release)
+    
+    def close_menu_on_click(event: Any) -> None:
+        """Close menu when clicking outside the widget."""
+        # Check if click is outside the widget
+        if event.widget != widget and menu.winfo_exists():
+            try:
+                menu.unpost()
+            except:
+                pass
+    
+    widget.bind("<Button-3>", show_menu)  # Right-click
+    # Close menu when clicking elsewhere - bind to root window
+    root = widget.winfo_toplevel()
+    root.bind("<Button-1>", close_menu_on_click, add="+")
+    root.bind("<Button-2>", close_menu_on_click, add="+")
+    root.bind("<Button-3>", close_menu_on_click, add="+")
+
+
 class EbayListingApp:
     def __init__(self) -> None:
         self.root = tk.Tk()
@@ -510,7 +570,10 @@ class EbayListingApp:
             ).grid(row=0, column=0, sticky="w")
             return
 
-        for index, category in enumerate(categories):
+        # Sort categories alphabetically by name
+        sorted_categories = sorted(categories, key=lambda cat: cat.get("name", "").lower())
+
+        for index, category in enumerate(sorted_categories):
             row = index // columns
             column = index % columns
             card = tk.Frame(
@@ -777,6 +840,7 @@ class EbayListingApp:
         entry = ttk.Entry(row, textvariable=self.global_search_var, width=50)
         entry.pack(side="left", fill="x", expand=True)
         entry.bind("<Return>", lambda _: self._perform_global_search(self.global_search_var.get()))
+        _add_context_menu(entry)
 
         ttk.Button(
             row,
